@@ -10,6 +10,8 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
+Current probe version: `1.0.1`
+
 ## Safety Model
 
 - This page does not exploit the browser.

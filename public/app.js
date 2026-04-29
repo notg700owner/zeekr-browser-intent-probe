@@ -544,7 +544,7 @@
   function buildReport() {
     return {
       tool: "Zeekr Browser Intent Probe",
-      version: "1.0.0",
+      version: "1.0.1",
       session_id: state.session_id,
       created_at: state.created_at,
       updated_at: new Date().toISOString(),
