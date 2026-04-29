@@ -1,8 +1,8 @@
 # Zeekr Browser Intent Probe
 
-A static, defensive browser probe for an authorised security assessment of a Zeekr 9X rear-screen Chromium-based browser / VM environment.
+A defensive, single-page browser probe for an authorised Zeekr 9X rear-screen Chromium / VM assessment.
 
-The goal is to record what the built-in browser can do when a user manually taps links, including APK downloads, custom schemes, Android `intent://` links, and standard Android Settings intents.
+The current pass focuses on what the rear browser itself exposes: Chromium version hints, platform identity, storage, download support, permissions, Web APIs, WebGL, WebRTC, service worker/cache availability, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
 
 Live deployment:
 
@@ -10,20 +10,19 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.1.0`
+Current probe version: `1.2.0`
 
-Build date: `2026-04-29T14:15:00Z`
+Build date: `2026-04-29T15:45:00Z`
 
 ## Safety Model
 
 - This page does not exploit the browser.
 - This page does not automatically open apps or settings.
-- This page saves test logs to the authorised Cloudflare Worker/KV backend for shared review across browsers.
-- This page also keeps a local browser copy as a fallback.
-- Every probe action requires a visible manual tap.
+- The one-button probe only runs non-destructive browser capability checks.
+- Manual `chrome://` links require a visible tap and do not change settings.
+- Logs are saved to the authorised Cloudflare Worker/KV backend so the car browser and Mac browser can see the same stream.
+- A local browser copy is kept as a fallback if the server log is unavailable.
 - Only use on systems you are authorised to test.
-
-The car browser and your Mac read/write the same shared server log. Open the Log / Report tab on your Mac to watch the car-generated log stream, then copy or download it for analysis.
 
 ## Project Structure
 
@@ -35,13 +34,11 @@ public/
   index.html
   styles.css
   app.js
-  apks/
-    README.md
 src/
   worker.js
 ```
 
-## Deploy To Cloudflare Workers Static Assets
+## Deploy
 
 Install dependencies:
 
@@ -49,19 +46,25 @@ Install dependencies:
 npm install
 ```
 
-Deploy:
+Build check:
 
 ```bash
-npx wrangler deploy
+npm run build
 ```
 
-Or use the included script:
+Deploy to Cloudflare Workers Static Assets:
 
 ```bash
 npm run deploy
 ```
 
-For the current Cloudflare Git integration, use:
+Equivalent direct command:
+
+```bash
+npx wrangler deploy
+```
+
+For Cloudflare Git integration, use:
 
 ```text
 Framework preset: None / Workers Static Assets
@@ -70,13 +73,7 @@ Deploy command: npx wrangler deploy
 Root directory: /
 ```
 
-This is a Workers Static Assets deployment because `/api/*` handles APK URL checks and the shared server log.
-
-## Shared Server Log
-
-The app posts each log entry to `/api/log`. The Worker stores logs in Cloudflare KV and exposes them as JSON at `/api/logs`. Clearing the log calls `/api/clear`, which clears the shared KV log. This lets the car browser generate logs while a Mac browser views the same stream from a separate session.
-
-The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV`.
+This is a Workers Static Assets deployment because `/api/*` is handled by the Worker and the static UI is served from `public/`.
 
 In non-interactive terminals, Wrangler requires a Cloudflare API token:
 
@@ -91,44 +88,47 @@ Preview locally:
 npm run preview
 ```
 
-## Add The APK
+## Shared Server Log
 
-Place the companion APK at:
+The browser posts each event to `/api/log`. The Worker stores logs in Cloudflare KV and exposes them at `/api/logs`. Clearing the log calls `/api/clear`, which clears the shared KV log.
+
+This lets the car browser generate logs while a Mac browser watches the same stream from the Shared Log tab.
+
+Useful endpoints:
 
 ```text
-public/apks/zeekr-rear-recon.apk
+/api/status
+/api/log
+/api/logs
+/api/clear
 ```
 
-Then redeploy the Pages site.
-
-If the APK MIME type does not trigger Android installation, try downloading the file first, then opening it from the browser downloads UI or file manager if available. Cloudflare may serve unknown binary files as `application/octet-stream`, which is usually acceptable but car browsers can vary.
+The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV`.
 
 ## How To Use In The Car
 
-1. Open the Cloudflare Pages URL in the rear browser.
-2. Review and record environment info.
-3. Test the APK download link.
-4. Install the companion APK if the browser and OS allow it.
-5. Test `zrr://` custom scheme links after APK installation.
-6. Test Android Settings intents.
-7. Open the Log / Report tab.
-8. Open the same URL on your Mac and use the Log / Report tab to view the shared server log.
-9. Copy or download the server log JSON and send it for analysis.
+1. Open the live URL in the rear browser.
+2. Press `Run browser probe`.
+3. If useful, manually tap selected `chrome://` surface links and record what happens.
+4. Add notes for dialogs, blocked actions, crashes, or VM/browser transitions.
+5. Open the same URL on your Mac.
+6. Use the Shared Log tab to view, copy, download, or clear the server log.
 
 ## Interpreting Results
 
-- Custom scheme opens APK: the browser can launch external handlers for that scheme.
-- `intent://` opens APK: Android intent syntax is supported by the browser / OS path.
-- Settings opens: the browser can reach exported Settings screens.
-- Developer settings opens: useful evidence, but not equivalent to ADB being enabled.
-- Nothing happens: the browser likely filters the scheme, the OS has no handler, or user activation was insufficient.
-- Browser error: the browser detected the link type but refused or failed to handle it.
+- `user_agent` and related version hints identify the Chromium family and whether the browser presents as Android, Linux, desktop Chrome, or a kiosk shell.
+- Download capability checks show browser support for constructing downloads, not a guarantee that the car browser UI will allow saving files.
+- Storage results show whether `localStorage`, `sessionStorage`, cookies, IndexedDB, and cache APIs are available in the VM browser.
+- Permission results show what the browser exposes through the Permissions API; they do not request dangerous access.
+- WebGL and WebRTC results help fingerprint graphics/network stack exposure.
+- `chrome://` links opening successfully may reveal useful version, sandbox, GPU, policy, download, or crash pages.
+- Nothing happens on an internal link usually means the browser filters it or the embedded Chromium shell blocks that surface.
 
 ## Troubleshooting
 
-- APK does not install: the browser may block APK downloads, the MIME type may not be recognised, or installation from browser sources may be disabled.
-- Browser blocks downloads: use the APK test button to record the behavior, then try the downloads UI if available.
-- Browser strips `intent://` URLs: copy the raw URI from the page and paste it into the address bar if the browser allows manual entry.
-- `localStorage` unavailable: the app falls back to in-memory logging and shows a warning. Export before closing the page.
-- Clipboard unavailable: use Download JSON or select the report text manually.
-- If the Mac does not show car logs, press Refresh server log and confirm `/api/status` reports `log_configured: true`.
+- Mac does not show car logs: press Refresh server log and confirm `/api/status` reports `log_configured: true`.
+- Logs appear locally but not on Mac: check the car browser has network access to the live Worker URL.
+- Download checks report support but the UI says downloads are unsupported: record that as a browser policy/UI restriction.
+- `localStorage` unavailable: the app falls back to memory for the current page session; keep the page open until the shared log posts.
+- Clipboard unavailable: use the Shared Log tab from the Mac instead of relying on the car browser clipboard.
+- `chrome://` pages do not open: this is expected in many embedded or kiosk Chromium builds; record the blocked result in notes.
