@@ -2,6 +2,8 @@
   "use strict";
 
   var STORAGE_KEY = "zbip.report.v1";
+  var APP_VERSION = "1.0.2";
+  var BUILD_DATE = "2026-04-29T13:48:16Z";
   var DEFAULT_APK_URL = "https://github.com/notg700owner/zeekr-rear-recon/releases/download/v1.1/rearscreenv1.1.apk";
   var SHEET_URL = "https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit";
   var importedReport = null;
@@ -52,6 +54,7 @@
   function init() {
     canUseLocalStorage = storageAvailable("localStorage");
     loadState();
+    renderBuildMeta();
     refreshEnvironment();
     detectCallback();
     bindTabs();
@@ -135,6 +138,11 @@
       host: location.host,
       path: location.pathname + location.search + location.hash
     };
+  }
+
+  function renderBuildMeta() {
+    document.getElementById("appVersion").textContent = APP_VERSION;
+    document.getElementById("buildDate").textContent = BUILD_DATE;
   }
 
   function detectCallback() {
@@ -544,7 +552,8 @@
   function buildReport() {
     return {
       tool: "Zeekr Browser Intent Probe",
-      version: "1.0.1",
+      version: APP_VERSION,
+      build_date: BUILD_DATE,
       session_id: state.session_id,
       created_at: state.created_at,
       updated_at: new Date().toISOString(),

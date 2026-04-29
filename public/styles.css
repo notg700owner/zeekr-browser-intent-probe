@@ -98,6 +98,15 @@ h1 {
   line-height: 1.05;
 }
 
+.build-meta {
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.build-meta strong {
+  color: var(--text);
+}
+
 h2 {
   font-size: 24px;
   line-height: 1.2;
