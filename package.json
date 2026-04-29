@@ -5,8 +5,8 @@
   "description": "Static defensive browser intent probe for authorised Zeekr rear-screen browser assessments.",
   "scripts": {
     "build": "node -e \"console.log('Static Cloudflare Pages site: public directory is ready')\"",
-    "preview": "npx wrangler pages dev public",
-    "deploy": "npx wrangler pages deploy public --project-name zeekr-browser-intent-probe"
+    "preview": "npx wrangler dev",
+    "deploy": "npx wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.14.4"

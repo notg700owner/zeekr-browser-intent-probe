@@ -45,7 +45,7 @@ tools/
   google_sheet_webhook.gs
 ```
 
-## Deploy To Cloudflare Pages
+## Deploy To Cloudflare Workers Static Assets
 
 Install dependencies:
 
@@ -56,7 +56,7 @@ npm install
 Deploy:
 
 ```bash
-npx wrangler pages deploy public --project-name zeekr-browser-intent-probe
+npx wrangler deploy
 ```
 
 Or use the included script:
@@ -65,18 +65,16 @@ Or use the included script:
 npm run deploy
 ```
 
-For Cloudflare Pages Git integration, use:
+For the current Cloudflare Git integration, use:
 
 ```text
-Framework preset: None
+Framework preset: None / Workers Static Assets
 Build command: npm run build
-Build output directory: public
+Deploy command: npx wrangler deploy
 Root directory: /
 ```
 
-Do not use `npx wrangler deploy` as the deploy command. That command targets Workers, not this static Pages site.
-
-The repository also supports the current Cloudflare configuration that runs `npx wrangler deploy`; `wrangler.toml` declares `public` as Workers Static Assets and routes `/api/*` to `src/worker.js`.
+This is now a Workers Static Assets deployment because `/api/*` handles APK URL checks and Google Sheet log forwarding.
 
 ## Google Sheet Log Mirror
 
