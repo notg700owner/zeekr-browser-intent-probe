@@ -4,6 +4,12 @@ A static, defensive browser probe for an authorised security assessment of a Zee
 
 The goal is to record what the built-in browser can do when a user manually taps links, including APK downloads, custom schemes, Android `intent://` links, and standard Android Settings intents.
 
+Live deployment:
+
+```text
+https://zeekr-browser-intent-probe.g700owner.workers.dev
+```
+
 ## Safety Model
 
 - This page does not exploit the browser.
