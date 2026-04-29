@@ -2,3 +2,8 @@ name = "zeekr-browser-intent-probe"
 compatibility_date = "2026-04-29"
 pages_build_output_dir = "public"
 
+# Cloudflare Pages should deploy the `public` directory directly. Some Pages
+# configurations still invoke `npx wrangler deploy`; this assets block lets that
+# command succeed as a static assets deployment instead of looking for a Worker.
+[assets]
+directory = "./public"
