@@ -12,7 +12,7 @@
     <div>
       <p class="eyebrow">Authorised defensive assessment</p>
       <h1>Zeekr Browser Intent Probe</h1>
-      <p class="build-meta">Version <strong id="appVersion">1.0.4</strong> · Build <strong id="buildDate">2026-04-29T14:05:00Z</strong></p>
+      <p class="build-meta">Version <strong id="appVersion">1.1.0</strong> · Build <strong id="buildDate">2026-04-29T14:15:00Z</strong></p>
     </div>
     <div class="status-pill" id="storageStatus">Storage: checking</div>
   </header>
@@ -20,7 +20,7 @@
   <section class="safety-banner">
     <strong>Privacy / Safety:</strong>
     This page does not exploit the browser or automatically open apps or settings.
-    Logs are stored locally and, when the server-side sheet webhook is configured, mirrored to the authorised Google Sheet.
+    Logs are saved to a shared Cloudflare server log so the car browser can generate entries and your Mac can view the same log stream.
     Only use on systems you are authorised to test.
   </section>
 
@@ -165,21 +165,18 @@
       <section class="panel">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Persistent Local Report</p>
-            <h2>Log / Sheet Mirror</h2>
+            <p class="eyebrow">Cloudflare KV</p>
+            <h2>Shared Server Log</h2>
           </div>
           <div class="button-row">
+            <button type="button" data-action="refresh-server-log">Refresh server log</button>
             <button type="button" data-action="copy-visible-log">Copy visible log</button>
-            <button type="button" data-action="copy-report">Copy full report JSON</button>
-            <button type="button" data-action="download-log">Download log JSON</button>
-            <button type="button" data-action="download-report">Download full report JSON</button>
+            <button type="button" data-action="download-log">Download server log JSON</button>
             <button type="button" class="danger" data-action="clear-log">Clear log</button>
           </div>
         </div>
         <p class="hint">
-          Google Sheet:
-          <a href="https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit" target="_blank" rel="noopener">Zeekr Browser Intent Probe Logs</a>.
-          Sheet sync status: <span id="sheetSyncStatus">checking</span>
+          Server log status: <span id="serverLogStatus">checking</span>
         </p>
         <div class="form-grid compact">
           <label class="field"><span>Filter by section</span><select id="sectionFilter"><option value="">All sections</option></select></label>
@@ -188,21 +185,6 @@
         <div class="log-panel tall" id="fullLog"></div>
       </section>
 
-      <section class="panel">
-        <div class="section-heading">
-          <div>
-            <p class="eyebrow">Transfer</p>
-            <h2>Export / Import</h2>
-          </div>
-          <div class="button-row">
-            <button type="button" data-action="render-report-json">Render report JSON</button>
-            <button type="button" data-action="import-report">Import pasted report</button>
-          </div>
-        </div>
-        <p class="hint">Reports are local to each browser. Paste JSON here on your Mac to inspect a report copied from the car browser.</p>
-        <textarea id="reportText" rows="12" placeholder="Report JSON appears here, or paste a report JSON to import"></textarea>
-        <p class="result" id="importResult"></p>
-      </section>
     </section>
   </main>
 

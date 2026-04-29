@@ -9,10 +9,11 @@ export default {
     if (url.pathname === "/api/status") {
       return json({
         ok: true,
-        sheet_configured: Boolean(env.LOGS_KV),
-        log_backend: env.LOGS_KV ? "cloudflare_kv_csv" : "not_configured",
+        log_configured: Boolean(env.LOGS_KV),
+        log_backend: env.LOGS_KV ? "cloudflare_kv" : "not_configured",
+        log_url: `${url.origin}/api/logs`,
         csv_url: `${url.origin}/api/logs.csv`,
-        sheet_url: "https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit"
+        stored_rows: env.LOGS_KV ? (await readRows(env)).length : 0
       });
     }
 
@@ -26,6 +27,10 @@ export default {
 
     if (url.pathname === "/api/clear" && request.method === "POST") {
       return clearLogs(env);
+    }
+
+    if (url.pathname === "/api/logs") {
+      return logsJson(env);
     }
 
     if (url.pathname === "/api/logs.csv") {
@@ -72,7 +77,7 @@ async function appendLog(request, env) {
   if (!env.LOGS_KV) {
     return json({
       ok: false,
-      sheet_configured: false,
+      log_configured: false,
       error: "LOGS_KV is not configured"
     });
   }
@@ -103,15 +108,25 @@ async function appendLog(request, env) {
   });
 
   await env.LOGS_KV.put("logs", JSON.stringify(rows.slice(-1000)));
-  return json({ ok: true, sheet_configured: true, stored_rows: rows.length });
+  return json({ ok: true, log_configured: true, stored_rows: rows.length });
 }
 
 async function clearLogs(env) {
   if (!env.LOGS_KV) {
-    return json({ ok: false, sheet_configured: false, error: "LOGS_KV is not configured" });
+    return json({ ok: false, log_configured: false, error: "LOGS_KV is not configured" });
   }
   await env.LOGS_KV.put("logs", JSON.stringify([]));
-  return json({ ok: true, sheet_configured: true, cleared: true });
+  return json({ ok: true, log_configured: true, cleared: true });
+}
+
+async function logsJson(env) {
+  const rows = await readRows(env);
+  return json({
+    ok: true,
+    log_configured: Boolean(env.LOGS_KV),
+    count: rows.length,
+    logs: rows
+  });
 }
 
 async function logsCsv(env) {

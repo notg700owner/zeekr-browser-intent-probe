@@ -10,26 +10,20 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.0.4`
+Current probe version: `1.1.0`
 
-Build date: `2026-04-29T14:05:00Z`
+Build date: `2026-04-29T14:15:00Z`
 
 ## Safety Model
 
 - This page does not exploit the browser.
 - This page does not automatically open apps or settings.
-- This page does not send data to third parties. When configured, it mirrors logs to the authorised Google Sheet through this Cloudflare Worker.
-- This page stores logs locally in the browser.
+- This page saves test logs to the authorised Cloudflare Worker/KV backend for shared review across browsers.
+- This page also keeps a local browser copy as a fallback.
 - Every probe action requires a visible manual tap.
 - Only use on systems you are authorised to test.
 
-The browser keeps a local copy of the report. When the Sheet webhook is configured, the Cloudflare Worker also mirrors log entries to the authorised Google Sheet so you can review them from your Mac.
-
-Current Google Sheet mirror:
-
-```text
-https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit
-```
+The car browser and your Mac read/write the same shared server log. Open the Log / Report tab on your Mac to watch the car-generated log stream, then copy or download it for analysis.
 
 ## Project Structure
 
@@ -45,8 +39,6 @@ public/
     README.md
 src/
   worker.js
-tools/
-  google_sheet_webhook.gs
 ```
 
 ## Deploy To Cloudflare Workers Static Assets
@@ -78,17 +70,11 @@ Deploy command: npx wrangler deploy
 Root directory: /
 ```
 
-This is now a Workers Static Assets deployment because `/api/*` handles APK URL checks and Google Sheet log forwarding.
+This is a Workers Static Assets deployment because `/api/*` handles APK URL checks and the shared server log.
 
-## Google Sheet Log Mirror
+## Shared Server Log
 
-The app posts each log entry to `/api/log`. The Worker stores logs in Cloudflare KV and exposes them as CSV at `/api/logs.csv`. The Google Sheet imports that CSV feed, so no Google credential or webhook URL is stored in GitHub or browser JavaScript. Clearing the log calls `/api/clear`, which clears the KV feed and therefore clears the imported Sheet rows on refresh.
-
-The Sheet has already been created:
-
-```text
-https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit
-```
+The app posts each log entry to `/api/log`. The Worker stores logs in Cloudflare KV and exposes them as JSON at `/api/logs`. Clearing the log calls `/api/clear`, which clears the shared KV log. This lets the car browser generate logs while a Mac browser views the same stream from a separate session.
 
 The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV`.
 
@@ -103,12 +89,6 @@ Preview locally:
 
 ```bash
 npm run preview
-```
-
-The Cloudflare Pages output directory is:
-
-```text
-public
 ```
 
 ## Add The APK
@@ -132,8 +112,8 @@ If the APK MIME type does not trigger Android installation, try downloading the 
 5. Test `zrr://` custom scheme links after APK installation.
 6. Test Android Settings intents.
 7. Open the Log / Report tab.
-8. Copy or download the report JSON.
-9. Paste/import the report JSON on your Mac or send it for analysis.
+8. Open the same URL on your Mac and use the Log / Report tab to view the shared server log.
+9. Copy or download the server log JSON and send it for analysis.
 
 ## Interpreting Results
 
@@ -151,4 +131,4 @@ If the APK MIME type does not trigger Android installation, try downloading the 
 - Browser strips `intent://` URLs: copy the raw URI from the page and paste it into the address bar if the browser allows manual entry.
 - `localStorage` unavailable: the app falls back to in-memory logging and shows a warning. Export before closing the page.
 - Clipboard unavailable: use Download JSON or select the report text manually.
-- Mac cannot see car logs automatically: this is expected. The probe intentionally has no backend upload path.
+- If the Mac does not show car logs, press Refresh server log and confirm `/api/status` reports `log_configured: true`.

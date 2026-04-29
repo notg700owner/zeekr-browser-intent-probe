@@ -2,14 +2,13 @@
   "use strict";
 
   var STORAGE_KEY = "zbip.report.v1";
-  var APP_VERSION = "1.0.4";
-  var BUILD_DATE = "2026-04-29T14:05:00Z";
+  var APP_VERSION = "1.1.0";
+  var BUILD_DATE = "2026-04-29T14:15:00Z";
   var DEFAULT_APK_URL = "https://github.com/notg700owner/zeekr-rear-recon/releases/download/v1.1/rearscreenv1.1.apk";
-  var SHEET_URL = "https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit";
-  var importedReport = null;
-  var canUseLocalStorage = false;
+      var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
-  var sheetConfigured = null;
+  var serverLogConfigured = null;
+  var serverLogs = [];
 
   var state = {
     session_id: getSessionId(),
@@ -64,7 +63,9 @@
     renderCustomLinks();
     renderSettingsLinks();
     renderAll();
-    checkSheetSync();
+    checkServerLog();
+    refreshServerLog();
+    setInterval(refreshServerLog, 5000);
     logEvent("session", "page loaded", location.href, "load", "", "");
   }
 
@@ -189,11 +190,9 @@
       if (action === "save-notes") return saveNotes();
       if (action === "generate-builder") return generateBuilderLinks();
       if (action === "copy-visible-log") return handleAction("report", "Copy visible log", "", "tap", function () { return copyText(JSON.stringify(getFilteredLogs(), null, 2)); });
-      if (action === "copy-report") return handleAction("report", "Copy full report JSON", "", "tap", function () { return copyText(JSON.stringify(buildReport(), null, 2)); });
-      if (action === "download-log") return handleAction("report", "Download log JSON", "", "tap", function () { downloadJson("zeekr-browser-intent-probe-log.json", state.logs); });
+      if (action === "download-log") return handleAction("report", "Download server log JSON", "", "tap", function () { downloadJson("zeekr-browser-intent-probe-server-log.json", serverLogs); });
+      if (action === "refresh-server-log") return refreshServerLog();
       if (action === "clear-log") return clearLog();
-      if (action === "render-report-json") return renderReportJson();
-      if (action === "import-report") return importReport();
     });
 
     window.addEventListener("online", function () { refreshEnvironment(); logEvent("session", "browser online", location.href, "event", "online", ""); });
@@ -483,13 +482,12 @@
   }
 
   function renderReport() {
-    var report = importedReport || state;
-    updateSectionFilter(report.logs || []);
-    renderLogList(document.getElementById("fullLog"), getFilteredLogs(report));
+    updateSectionFilter(serverLogs);
+    renderLogList(document.getElementById("fullLog"), getFilteredLogs());
   }
 
-  function getFilteredLogs(report) {
-    var logs = (report && report.logs) || state.logs;
+  function getFilteredLogs() {
+    var logs = serverLogs.length ? serverLogs : state.logs;
     var section = document.getElementById("sectionFilter").value;
     var search = document.getElementById("logSearch").value.trim().toLowerCase();
     return logs.filter(function (entry) {
@@ -562,33 +560,17 @@
       callbacks: state.callbacks,
       manual_results: state.manual_results,
       notes: state.notes,
-      logs: state.logs
+      local_logs: state.logs,
+      server_logs: serverLogs
     };
   }
 
-  function renderReportJson() {
-    document.getElementById("reportText").value = JSON.stringify(buildReport(), null, 2);
-    logEvent("report", "Render report JSON", "", "tap", "rendered", "");
-  }
-
-  function importReport() {
-    var text = document.getElementById("reportText").value.trim();
-    if (!text) return;
-    try {
-      importedReport = JSON.parse(text);
-      document.getElementById("importResult").textContent = "Imported report for viewing. This did not overwrite the local car/browser session.";
-      renderReport();
-    } catch (err) {
-      document.getElementById("importResult").textContent = "Import failed: " + err.message;
-    }
-  }
-
   function clearLog() {
-    if (!confirm("Clear local log entries and the Google Sheet mirror? Environment, notes, and manual results stay unless you clear the full session.")) return;
+    if (!confirm("Clear the shared server log and local log entries?")) return;
     state.logs = [];
     saveState();
     renderAll();
-    clearSheetMirror();
+    clearServerLog();
   }
 
   function clearSession() {
@@ -606,20 +588,15 @@
     };
     refreshEnvironment();
     renderAll();
-    clearSheetMirror();
+    clearServerLog();
   }
 
   function postLogEntry(entry) {
-    if (sheetConfigured === false) {
-      setSheetSyncStatus("sheet not configured");
-      return;
-    }
     logSyncQueue = logSyncQueue.then(function () {
       return fetch("/api/log", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sheet_url: SHEET_URL,
           session_id: state.session_id,
           environment: state.environment,
           entry: entry
@@ -631,48 +608,65 @@
           return response.json();
         })
         .then(function (body) {
-          sheetConfigured = Boolean(body.sheet_configured);
-          setSheetSyncStatus(body.sheet_configured ? "synced to Sheet feed" : "sheet not configured");
+          serverLogConfigured = Boolean(body.log_configured);
+          setServerLogStatus(body.log_configured ? "synced (" + body.stored_rows + " rows)" : "server log not configured");
+          refreshServerLog();
         })
         .catch(function (err) {
-          setSheetSyncStatus("not synced: " + err.message);
+          setServerLogStatus("not synced: " + err.message);
         });
     });
   }
 
-  function clearSheetMirror() {
+  function clearServerLog() {
     fetch("/api/clear", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: state.session_id, sheet_url: SHEET_URL })
+      body: JSON.stringify({ session_id: state.session_id })
     })
       .then(function (response) {
         if (!response.ok) throw new Error("HTTP " + response.status);
         return response.json();
       })
       .then(function (body) {
-        sheetConfigured = Boolean(body.sheet_configured);
-        setSheetSyncStatus(body.sheet_configured ? "sheet feed cleared" : "sheet not configured");
+        serverLogConfigured = Boolean(body.log_configured);
+        serverLogs = [];
+        setServerLogStatus(body.log_configured ? "server log cleared" : "server log not configured");
+        renderReport();
       })
       .catch(function (err) {
-        setSheetSyncStatus("clear failed: " + err.message);
+        setServerLogStatus("clear failed: " + err.message);
       });
   }
 
-  function checkSheetSync() {
+  function checkServerLog() {
     fetch("/api/status", { cache: "no-store" })
       .then(function (response) { return response.json(); })
       .then(function (body) {
-        sheetConfigured = Boolean(body.sheet_configured);
-        setSheetSyncStatus(body.sheet_configured ? "ready via Sheet feed" : "sheet not configured");
+        serverLogConfigured = Boolean(body.log_configured);
+        setServerLogStatus(body.log_configured ? "ready (" + body.stored_rows + " rows)" : "server log not configured");
       })
       .catch(function () {
-        setSheetSyncStatus("unavailable");
+        setServerLogStatus("unavailable");
       });
   }
 
-  function setSheetSyncStatus(text) {
-    var el = document.getElementById("sheetSyncStatus");
+  function refreshServerLog() {
+    return fetch("/api/logs", { cache: "no-store" })
+      .then(function (response) { return response.json(); })
+      .then(function (body) {
+        serverLogConfigured = Boolean(body.log_configured);
+        serverLogs = Array.isArray(body.logs) ? body.logs.slice().reverse() : [];
+        setServerLogStatus(body.log_configured ? "streaming (" + body.count + " rows)" : "server log not configured");
+        renderReport();
+      })
+      .catch(function (err) {
+        setServerLogStatus("refresh failed: " + err.message);
+      });
+  }
+
+  function setServerLogStatus(text) {
+    var el = document.getElementById("serverLogStatus");
     if (el) el.textContent = text;
   }
 
