@@ -2,8 +2,11 @@
   "use strict";
 
   var STORAGE_KEY = "zbip.report.v1";
+  var DEFAULT_APK_URL = "https://github.com/notg700owner/zeekr-rear-recon/releases/download/v1.1/rearscreenv1.1.apk";
+  var SHEET_URL = "https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit";
   var importedReport = null;
   var canUseLocalStorage = false;
+  var logSyncQueue = Promise.resolve();
 
   var state = {
     session_id: getSessionId(),
@@ -35,7 +38,7 @@
     ["Open same-origin test page anchor", "Navigate to a harmless local hash", function () { openUri(location.origin + location.pathname + "#same-origin-test-" + Date.now()); return "opened link attempt"; }],
     ["Open blob download test", "Create a local blob and open it", openBlobDownload],
     ["Open text file download test", "Create a text file download", openTextDownload],
-    ["Open APK path", "Open /apks/zeekr-rear-recon.apk", function () { openUri(resolveUrl("/apks/zeekr-rear-recon.apk")); return "opened link attempt"; }],
+    ["Open APK URL", "Open the configured Zeekr Rear Recon APK URL", function () { openUri(getApkUrl()); return "opened link attempt"; }],
     ["window.open test", "Call window.open only from this tap", function () { var w = window.open(location.href + "#window-open-" + Date.now(), "_blank"); return w ? "window.open returned a window object" : "window.open returned null or was blocked"; }],
     ["localStorage write/read test", "Write and read a local key", testLocalStorage],
     ["sessionStorage write/read test", "Write and read a session key", testSessionStorage],
@@ -57,6 +60,7 @@
     renderCustomLinks();
     renderSettingsLinks();
     renderAll();
+    checkSheetSync();
     logEvent("session", "page loaded", location.href, "load", "", "");
   }
 
@@ -204,7 +208,7 @@
   }
 
   function logEvent(section, testName, uri, userAction, manualResult, notes) {
-    state.logs.unshift({
+    var entry = {
       timestamp: new Date().toISOString(),
       section: section,
       test_name: testName,
@@ -212,9 +216,11 @@
       user_action: userAction || "",
       manual_result: manualResult || "",
       notes: notes || ""
-    });
+    };
+    state.logs.unshift(entry);
     saveState();
     renderAll();
+    postLogEntry(entry);
   }
 
   function markManual(section, testName, uri, result) {
@@ -366,7 +372,7 @@
   }
 
   function getApkUrl() {
-    return resolveUrl(document.getElementById("apkUrl").value || "/apks/zeekr-rear-recon.apk");
+    return resolveUrl(document.getElementById("apkUrl").value || DEFAULT_APK_URL);
   }
 
   function openApkUrl() {
@@ -379,9 +385,17 @@
     var uri = getApkUrl();
     var resultEl = document.getElementById("apkResult");
     resultEl.textContent = "Testing link after manual tap...";
-    fetch(uri, { method: "HEAD", cache: "no-store" })
+    fetch("/api/check-url?url=" + encodeURIComponent(uri), { cache: "no-store" })
       .then(function (response) {
-        var message = response.ok ? "Reachable: HTTP " + response.status : "Possibly missing or blocked: HTTP " + response.status;
+        return response.json().then(function (body) {
+          return { ok: response.ok, status: response.status, body: body };
+        });
+      })
+      .then(function (result) {
+        var body = result.body || {};
+        var message = body.ok
+          ? "Reachable: HTTP " + body.status + (body.content_type ? " (" + body.content_type + ")" : "")
+          : "Possibly missing or blocked: " + (body.error || ("HTTP " + body.status));
         resultEl.textContent = message;
         logEvent("apk", "Test APK download link", uri, "tap", message, "");
       })
@@ -560,10 +574,11 @@
   }
 
   function clearLog() {
-    if (!confirm("Clear local log entries? Environment, notes, and manual results stay unless you clear the full session.")) return;
+    if (!confirm("Clear local log entries and the Google Sheet mirror? Environment, notes, and manual results stay unless you clear the full session.")) return;
     state.logs = [];
     saveState();
     renderAll();
+    clearSheetMirror();
   }
 
   function clearSession() {
@@ -581,6 +596,67 @@
     };
     refreshEnvironment();
     renderAll();
+    clearSheetMirror();
+  }
+
+  function postLogEntry(entry) {
+    logSyncQueue = logSyncQueue.then(function () {
+      return fetch("/api/log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheet_url: SHEET_URL,
+          session_id: state.session_id,
+          environment: state.environment,
+          entry: entry
+        }),
+        keepalive: true
+      })
+        .then(function (response) {
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          return response.json();
+        })
+        .then(function (body) {
+          setSheetSyncStatus(body.sheet_configured ? "synced" : "server not configured");
+        })
+        .catch(function (err) {
+          setSheetSyncStatus("not synced: " + err.message);
+        });
+    });
+  }
+
+  function clearSheetMirror() {
+    fetch("/api/clear", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: state.session_id, sheet_url: SHEET_URL })
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.json();
+      })
+      .then(function (body) {
+        setSheetSyncStatus(body.sheet_configured ? "sheet cleared" : "server not configured");
+      })
+      .catch(function (err) {
+        setSheetSyncStatus("clear failed: " + err.message);
+      });
+  }
+
+  function checkSheetSync() {
+    fetch("/api/status", { cache: "no-store" })
+      .then(function (response) { return response.json(); })
+      .then(function (body) {
+        setSheetSyncStatus(body.sheet_configured ? "ready" : "server not configured");
+      })
+      .catch(function () {
+        setSheetSyncStatus("unavailable");
+      });
+  }
+
+  function setSheetSyncStatus(text) {
+    var el = document.getElementById("sheetSyncStatus");
+    if (el) el.textContent = text;
   }
 
   function copyText(text) {

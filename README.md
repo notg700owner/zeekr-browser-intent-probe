@@ -14,12 +14,18 @@ https://zeekr-browser-intent-probe.g700owner.workers.dev
 
 - This page does not exploit the browser.
 - This page does not automatically open apps or settings.
-- This page does not upload data anywhere.
+- This page does not send data to third parties. When configured, it mirrors logs to the authorised Google Sheet through this Cloudflare Worker.
 - This page stores logs locally in the browser.
 - Every probe action requires a visible manual tap.
 - Only use on systems you are authorised to test.
 
-Because this is a static Cloudflare Pages site with no backend, reports are local to each browser. To inspect a report on your Mac, copy or download the report from the car browser, then paste/import it into the Log / Report tab on your Mac.
+The browser keeps a local copy of the report. When the Sheet webhook is configured, the Cloudflare Worker also mirrors log entries to the authorised Google Sheet so you can review them from your Mac.
+
+Current Google Sheet mirror:
+
+```text
+https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit
+```
 
 ## Project Structure
 
@@ -33,6 +39,10 @@ public/
   app.js
   apks/
     README.md
+src/
+  worker.js
+tools/
+  google_sheet_webhook.gs
 ```
 
 ## Deploy To Cloudflare Pages
@@ -65,6 +75,37 @@ Root directory: /
 ```
 
 Do not use `npx wrangler deploy` as the deploy command. That command targets Workers, not this static Pages site.
+
+The repository also supports the current Cloudflare configuration that runs `npx wrangler deploy`; `wrangler.toml` declares `public` as Workers Static Assets and routes `/api/*` to `src/worker.js`.
+
+## Google Sheet Log Mirror
+
+The app posts each log entry to `/api/log`. The Worker forwards logs to a Google Apps Script webhook when `LOG_WEBHOOK_URL` is configured. Clearing the log calls `/api/clear`, which clears rows below the header in the Sheet.
+
+The Sheet has already been created:
+
+```text
+https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit
+```
+
+To enable the live mirror:
+
+1. Open Google Apps Script.
+2. Create a new script and paste `tools/google_sheet_webhook.gs`.
+3. Deploy it as a Web App with access set to anyone with the URL.
+4. In Cloudflare, set the Worker secret or variable:
+
+```bash
+npx wrangler secret put LOG_WEBHOOK_URL
+```
+
+Paste the Apps Script Web App URL as the value.
+
+If you set `SHARED_SECRET` in the Apps Script, also set:
+
+```bash
+npx wrangler secret put LOG_SHARED_SECRET
+```
 
 In non-interactive terminals, Wrangler requires a Cloudflare API token:
 
