@@ -10,9 +10,9 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.0.3`
+Current probe version: `1.0.4`
 
-Build date: `2026-04-29T13:55:00Z`
+Build date: `2026-04-29T14:05:00Z`
 
 ## Safety Model
 
@@ -82,7 +82,7 @@ This is now a Workers Static Assets deployment because `/api/*` handles APK URL 
 
 ## Google Sheet Log Mirror
 
-The app posts each log entry to `/api/log`. The Worker forwards logs to a Google Apps Script webhook when `LOG_WEBHOOK_URL` is configured. Clearing the log calls `/api/clear`, which clears rows below the header in the Sheet.
+The app posts each log entry to `/api/log`. The Worker stores logs in Cloudflare KV and exposes them as CSV at `/api/logs.csv`. The Google Sheet imports that CSV feed, so no Google credential or webhook URL is stored in GitHub or browser JavaScript. Clearing the log calls `/api/clear`, which clears the KV feed and therefore clears the imported Sheet rows on refresh.
 
 The Sheet has already been created:
 
@@ -90,24 +90,7 @@ The Sheet has already been created:
 https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit
 ```
 
-To enable the live mirror:
-
-1. Open Google Apps Script.
-2. Create a new script and paste `tools/google_sheet_webhook.gs`.
-3. Deploy it as a Web App with access set to anyone with the URL.
-4. In Cloudflare, set the Worker secret or variable:
-
-```bash
-npx wrangler secret put LOG_WEBHOOK_URL
-```
-
-Paste the Apps Script Web App URL as the value.
-
-If you set `SHARED_SECRET` in the Apps Script, also set:
-
-```bash
-npx wrangler secret put LOG_SHARED_SECRET
-```
+The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV`.
 
 In non-interactive terminals, Wrangler requires a Cloudflare API token:
 

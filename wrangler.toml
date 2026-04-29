@@ -7,3 +7,7 @@ main = "./src/worker.js"
 directory = "./public"
 binding = "STATIC_ASSETS"
 run_worker_first = ["/api/*"]
+
+[[kv_namespaces]]
+binding = "LOGS_KV"
+id = "a6f48c45f3e84a78b47a8429e14b7f2d"

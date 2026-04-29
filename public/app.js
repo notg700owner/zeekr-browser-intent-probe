@@ -2,8 +2,8 @@
   "use strict";
 
   var STORAGE_KEY = "zbip.report.v1";
-  var APP_VERSION = "1.0.3";
-  var BUILD_DATE = "2026-04-29T13:55:00Z";
+  var APP_VERSION = "1.0.4";
+  var BUILD_DATE = "2026-04-29T14:05:00Z";
   var DEFAULT_APK_URL = "https://github.com/notg700owner/zeekr-rear-recon/releases/download/v1.1/rearscreenv1.1.apk";
   var SHEET_URL = "https://docs.google.com/spreadsheets/d/1WIbHycHdbo59ZDMxTi8jssTu-Gjtze94-bB22FKHnqA/edit";
   var importedReport = null;
@@ -632,7 +632,7 @@
         })
         .then(function (body) {
           sheetConfigured = Boolean(body.sheet_configured);
-          setSheetSyncStatus(body.sheet_configured ? "synced" : "sheet not configured");
+          setSheetSyncStatus(body.sheet_configured ? "synced to Sheet feed" : "sheet not configured");
         })
         .catch(function (err) {
           setSheetSyncStatus("not synced: " + err.message);
@@ -652,7 +652,7 @@
       })
       .then(function (body) {
         sheetConfigured = Boolean(body.sheet_configured);
-        setSheetSyncStatus(body.sheet_configured ? "sheet cleared" : "sheet not configured");
+        setSheetSyncStatus(body.sheet_configured ? "sheet feed cleared" : "sheet not configured");
       })
       .catch(function (err) {
         setSheetSyncStatus("clear failed: " + err.message);
@@ -664,7 +664,7 @@
       .then(function (response) { return response.json(); })
       .then(function (body) {
         sheetConfigured = Boolean(body.sheet_configured);
-        setSheetSyncStatus(body.sheet_configured ? "ready" : "sheet not configured");
+        setSheetSyncStatus(body.sheet_configured ? "ready via Sheet feed" : "sheet not configured");
       })
       .catch(function () {
         setSheetSyncStatus("unavailable");
