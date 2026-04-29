@@ -1,0 +1,13 @@
+{
+  "name": "zeekr-browser-intent-probe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static defensive browser intent probe for authorised Zeekr rear-screen browser assessments.",
+  "scripts": {
+    "preview": "npx wrangler pages dev public",
+    "deploy": "npx wrangler pages deploy public --project-name zeekr-browser-intent-probe"
+  },
+  "devDependencies": {
+    "wrangler": "^4.14.4"
+  }
+}

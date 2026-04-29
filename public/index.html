@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f14">
+  <title>Zeekr Browser Intent Probe</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Authorised defensive assessment</p>
+      <h1>Zeekr Browser Intent Probe</h1>
+    </div>
+    <div class="status-pill" id="storageStatus">Storage: checking</div>
+  </header>
+
+  <section class="safety-banner">
+    <strong>Privacy / Safety:</strong>
+    This page does not exploit the browser, automatically open apps or settings, or upload data anywhere.
+    Logs stay local in this browser until you export them or press clear. Only use on systems you are authorised to test.
+  </section>
+
+  <nav class="tabs" aria-label="Main tabs">
+    <button class="tab is-active" data-tab="probe" type="button">Probe</button>
+    <button class="tab" data-tab="report" type="button">Log / Report</button>
+  </nav>
+
+  <main>
+    <section class="tab-panel is-active" id="tab-probe">
+      <section class="panel callback hidden" id="callbackBanner">
+        <h2>Callback received</h2>
+        <pre id="callbackData"></pre>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Session Header</p>
+            <h2>Environment</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" data-action="refresh-env">Refresh environment info</button>
+            <button type="button" data-action="copy-env">Copy environment info</button>
+            <button type="button" data-action="download-report">Download JSON report</button>
+            <button type="button" class="danger" data-action="clear-session">Clear local session</button>
+          </div>
+        </div>
+        <dl class="info-grid" id="envInfo"></dl>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">APK Install Section</p>
+            <h2>Download Zeekr Rear Recon APK</h2>
+          </div>
+        </div>
+        <p class="hint">Default path: <code>/apks/zeekr-rear-recon.apk</code>. The browser only opens this if you tap a button.</p>
+        <label class="field">
+          <span>APK URL</span>
+          <input id="apkUrl" type="url" value="/apks/zeekr-rear-recon.apk" inputmode="url">
+        </label>
+        <div class="button-row large">
+          <button type="button" data-action="open-apk-url">Open APK URL</button>
+          <button type="button" data-action="copy-apk-url">Copy APK URL</button>
+          <button type="button" data-action="test-apk-url">Test APK download link</button>
+        </div>
+        <p class="result" id="apkResult">Tap “Test APK download link” to check whether the file appears reachable.</p>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Basic Browser Capability Tests</p>
+            <h2>Manual Tests</h2>
+          </div>
+        </div>
+        <div class="test-grid" id="basicTests"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Custom Scheme Test</p>
+            <h2>External Handler Manual Probe</h2>
+          </div>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span>Scheme</span><input id="schemeInput" value="zrr"></label>
+          <label class="field"><span>Package</span><input id="packageInput" value="com.zeekr.rearrecon"></label>
+          <label class="field"><span>Host / path</span><input id="hostPathInput" value="ping"></label>
+        </div>
+        <div class="button-row">
+          <button type="button" data-action="refresh-custom-links">Regenerate links</button>
+        </div>
+        <div class="link-list" id="customLinks"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Android Settings Intent Tests</p>
+            <h2>Settings Manual Probes</h2>
+          </div>
+        </div>
+        <p class="warning">This only opens a settings screen if the browser and OS allow it. It does not change any setting.</p>
+        <div class="link-list" id="settingsLinks"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Package / Component Intent Builder</p>
+            <h2>Advanced Manual Builder</h2>
+          </div>
+        </div>
+        <p class="hint">Only use actions/components discovered separately by the authorised APK recon tool. No OEM package guesses are preloaded, and nothing auto-launches.</p>
+        <div class="form-grid">
+          <label class="field"><span>Action</span><input id="builderAction" placeholder="android.intent.action.VIEW"></label>
+          <label class="field"><span>Scheme</span><input id="builderScheme" placeholder="zrr"></label>
+          <label class="field"><span>Package</span><input id="builderPackage" placeholder="com.example.app"></label>
+          <label class="field"><span>Component package</span><input id="builderComponentPackage"></label>
+          <label class="field"><span>Component class</span><input id="builderComponentClass"></label>
+          <label class="field"><span>Category</span><input id="builderCategory" placeholder="android.intent.category.DEFAULT"></label>
+          <label class="field"><span>Extra string key</span><input id="builderExtraKey"></label>
+          <label class="field"><span>Extra string value</span><input id="builderExtraValue"></label>
+          <label class="field"><span>Fallback URL</span><input id="builderFallback" type="url"></label>
+        </div>
+        <div class="button-row">
+          <button type="button" data-action="generate-builder">Generate</button>
+        </div>
+        <div class="link-list" id="builderLinks"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Notes Field</p>
+            <h2>Observations</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" data-action="save-notes">Save notes</button>
+          </div>
+        </div>
+        <p class="hint">Prompts: Did a system dialog appear? Did the browser show an error? Did the screen flash? Did the browser crash? Did the VM exit? Did the front screen react?</p>
+        <textarea id="notes" rows="7" placeholder="Type observations here"></textarea>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Recent Log</p>
+            <h2>Local Events</h2>
+          </div>
+        </div>
+        <div class="log-panel" id="recentLog"></div>
+      </section>
+    </section>
+
+    <section class="tab-panel" id="tab-report">
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Persistent Local Report</p>
+            <h2>Log / Report Tab</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" data-action="copy-visible-log">Copy visible log</button>
+            <button type="button" data-action="copy-report">Copy full report JSON</button>
+            <button type="button" data-action="download-log">Download log JSON</button>
+            <button type="button" data-action="download-report">Download full report JSON</button>
+            <button type="button" class="danger" data-action="clear-log">Clear log</button>
+          </div>
+        </div>
+        <div class="form-grid compact">
+          <label class="field"><span>Filter by section</span><select id="sectionFilter"><option value="">All sections</option></select></label>
+          <label class="field"><span>Search log</span><input id="logSearch" placeholder="Search test, URI, result, notes"></label>
+        </div>
+        <div class="log-panel tall" id="fullLog"></div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Transfer</p>
+            <h2>Export / Import</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" data-action="render-report-json">Render report JSON</button>
+            <button type="button" data-action="import-report">Import pasted report</button>
+          </div>
+        </div>
+        <p class="hint">Reports are local to each browser. Paste JSON here on your Mac to inspect a report copied from the car browser.</p>
+        <textarea id="reportText" rows="12" placeholder="Report JSON appears here, or paste a report JSON to import"></textarea>
+        <p class="result" id="importResult"></p>
+      </section>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
