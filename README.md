@@ -49,6 +49,17 @@ Or use the included script:
 npm run deploy
 ```
 
+For Cloudflare Pages Git integration, use:
+
+```text
+Framework preset: None
+Build command: npm run build
+Build output directory: public
+Root directory: /
+```
+
+Do not use `npx wrangler deploy` as the deploy command. That command targets Workers, not this static Pages site.
+
 In non-interactive terminals, Wrangler requires a Cloudflare API token:
 
 ```bash
