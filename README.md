@@ -10,9 +10,9 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.0.2`
+Current probe version: `1.0.3`
 
-Build date: `2026-04-29T13:48:16Z`
+Build date: `2026-04-29T13:55:00Z`
 
 ## Safety Model
 

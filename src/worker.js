@@ -68,7 +68,7 @@ async function forwardToSheet(request, env, action) {
       ok: false,
       sheet_configured: false,
       error: "LOG_WEBHOOK_URL is not configured"
-    }, 501);
+    });
   }
 
   let payload;
