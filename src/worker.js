@@ -13,12 +13,13 @@ export default {
         log_backend: env.LOGS_KV ? "cloudflare_kv" : "not_configured",
         log_url: `${url.origin}/api/logs`,
         csv_url: `${url.origin}/api/logs.csv`,
+        client_info_url: `${url.origin}/api/client-info`,
         stored_rows: env.LOGS_KV ? (await readRows(env)).length : 0
       });
     }
 
-    if (url.pathname === "/api/check-url") {
-      return checkUrl(url.searchParams.get("url"));
+    if (url.pathname === "/api/client-info") {
+      return clientInfo(request);
     }
 
     if (url.pathname === "/api/log" && request.method === "POST") {
@@ -41,36 +42,29 @@ export default {
   }
 };
 
-async function checkUrl(target) {
-  if (!target) return json({ ok: false, error: "missing url" }, 400);
-
-  let parsed;
-  try {
-    parsed = new URL(target);
-  } catch (err) {
-    return json({ ok: false, error: "invalid url" }, 400);
-  }
-
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    return json({ ok: false, error: "only http/https URLs can be checked" }, 400);
-  }
-
-  try {
-    const response = await fetch(parsed.href, {
-      method: "HEAD",
-      redirect: "follow",
-      headers: { "User-Agent": "Zeekr-Browser-Intent-Probe/1.0" }
-    });
-    return json({
-      ok: response.ok,
-      status: response.status,
-      final_url: response.url,
-      content_type: response.headers.get("content-type") || "",
-      content_length: response.headers.get("content-length") || ""
-    }, response.ok ? 200 : 502);
-  } catch (err) {
-    return json({ ok: false, error: err.message }, 502);
-  }
+function clientInfo(request) {
+  const headers = request.headers;
+  const cf = request.cf || {};
+  return json({
+    ok: true,
+    observed_at: new Date().toISOString(),
+    ip: headers.get("cf-connecting-ip") || "",
+    country: headers.get("cf-ipcountry") || "",
+    colo: cf.colo || "",
+    asn: cf.asn || null,
+    as_organization: cf.asOrganization || "",
+    city: cf.city || "",
+    region: cf.region || "",
+    timezone: cf.timezone || "",
+    tls_version: cf.tlsVersion || "",
+    tls_cipher: cf.tlsCipher || "",
+    http_protocol: cf.httpProtocol || "",
+    user_agent: headers.get("user-agent") || "",
+    accept_language: headers.get("accept-language") || "",
+    sec_ch_ua: headers.get("sec-ch-ua") || "",
+    sec_ch_ua_platform: headers.get("sec-ch-ua-platform") || "",
+    sec_ch_ua_mobile: headers.get("sec-ch-ua-mobile") || ""
+  });
 }
 
 async function appendLog(request, env) {

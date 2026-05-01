@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v2";
-  var APP_VERSION = "1.2.0";
-  var BUILD_DATE = "2026-04-29T15:45:00Z";
+  var STORAGE_KEY = "zbip.report.v3";
+  var APP_VERSION = "1.3.0";
+  var BUILD_DATE = "2026-05-01T16:57:02Z";
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
   var serverLogs = [];
@@ -86,14 +86,21 @@
 
     var tests = [
       ["Chromium version hints", collectVersionHints],
+      ["High entropy client hints", collectHighEntropyClientHints],
+      ["Server observed client info", collectServerClientInfo],
       ["Security context and isolation", collectSecurityContext],
       ["Storage and cookie capability", testStorageCapabilities],
+      ["Cache persistence check", testCachePersistence],
       ["Download capability", testDownloadCapabilities],
       ["Permissions API snapshot", collectPermissions],
       ["High-risk web APIs", collectHighRiskApis],
+      ["Non-prompt device surface snapshot", collectDeviceSurfaces],
       ["WebGL fingerprint", collectWebGl],
+      ["WebGPU adapter snapshot", collectWebGpu],
       ["WebRTC support", collectWebRtc],
       ["Service worker and cache", collectWorkerAndCache],
+      ["Frame and policy surface", collectFrameAndPolicySurface],
+      ["Patch candidate matrix", collectPatchCandidateMatrix],
       ["Internal scheme navigation", testInternalSchemes]
     ];
 
@@ -131,6 +138,42 @@
     });
   }
 
+  async function collectHighEntropyClientHints() {
+    var out = {
+      supported: Boolean(navigator.userAgentData && navigator.userAgentData.getHighEntropyValues)
+    };
+    if (!out.supported) return out;
+    var names = [
+      "architecture",
+      "bitness",
+      "brands",
+      "fullVersionList",
+      "mobile",
+      "model",
+      "platform",
+      "platformVersion",
+      "uaFullVersion",
+      "wow64"
+    ];
+    try {
+      out.values = await navigator.userAgentData.getHighEntropyValues(names);
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
+  }
+
+  async function collectServerClientInfo() {
+    try {
+      var response = await fetch("/api/client-info", { cache: "no-store" });
+      var body = await response.json();
+      body.note = "Observed by the Cloudflare Worker from this browser request.";
+      return body;
+    } catch (err) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
   function collectSecurityContext() {
     return Promise.resolve({
       is_secure_context: window.isSecureContext,
@@ -144,6 +187,27 @@
       fenced_frame: "HTMLFencedFrameElement" in window,
       csp_nonce_present: Boolean(document.querySelector("script[nonce], style[nonce]"))
     });
+  }
+
+  async function testCachePersistence() {
+    var out = { caches_supported: "caches" in window };
+    if (!out.caches_supported) return out;
+    var cacheName = "zbip-probe-cache-v1";
+    var key = "/__zbip_cache_probe__?ts=" + Date.now();
+    try {
+      var cache = await caches.open(cacheName);
+      await cache.put(key, new Response("zbip-cache-ok", {
+        headers: { "Content-Type": "text/plain", "X-ZBIP-Probe": "1" }
+      }));
+      var match = await cache.match(key);
+      out.write_read = Boolean(match);
+      out.value = match ? await match.text() : "";
+      await cache.delete(key);
+      out.deleted_entry = true;
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
   }
 
   function testStorageCapabilities() {
@@ -210,15 +274,70 @@
       webgl: Boolean(document.createElement("canvas").getContext("webgl")),
       webgl2: Boolean(document.createElement("canvas").getContext("webgl2")),
       wasm: typeof WebAssembly !== "undefined",
-      webassembly_compile_streaming: Boolean(WebAssembly && WebAssembly.compileStreaming),
+      webassembly_compile_streaming: typeof WebAssembly !== "undefined" && Boolean(WebAssembly.compileStreaming),
       payment_request: "PaymentRequest" in window,
       presentation_api: "PresentationRequest" in window,
       contacts_api: "contacts" in navigator,
       share_api: "share" in navigator,
+      media_devices: Boolean(navigator.mediaDevices),
+      enumerate_devices: Boolean(navigator.mediaDevices && navigator.mediaDevices.enumerateDevices),
+      get_user_media: Boolean(navigator.mediaDevices && navigator.mediaDevices.getUserMedia),
+      get_display_media: Boolean(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia),
+      credential_management: "credentials" in navigator,
+      idle_detection: "IdleDetector" in window,
+      file_system_access: "showOpenFilePicker" in window || "showSaveFilePicker" in window,
+      launch_queue: "launchQueue" in window,
+      serial: "serial" in navigator,
       wake_lock: "wakeLock" in navigator,
       device_memory: navigator.deviceMemory || null,
       hardware_concurrency: navigator.hardwareConcurrency || null
     });
+  }
+
+  async function collectDeviceSurfaces() {
+    var out = {
+      note: "No permission prompts are intentionally triggered here. Calls are limited to availability or already-granted device lists."
+    };
+    if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+      try {
+        var devices = await navigator.mediaDevices.enumerateDevices();
+        out.media_devices = devices.map(function (device) {
+          return {
+            kind: device.kind,
+            label_present: Boolean(device.label),
+            device_id_present: Boolean(device.deviceId),
+            group_id_present: Boolean(device.groupId)
+          };
+        });
+      } catch (err) {
+        out.media_devices_error = err.message || String(err);
+      }
+    } else {
+      out.media_devices = "unsupported";
+    }
+
+    if (navigator.usb && navigator.usb.getDevices) {
+      try {
+        var usbDevices = await navigator.usb.getDevices();
+        out.usb_previously_authorized_count = usbDevices.length;
+      } catch (err2) {
+        out.usb_error = err2.message || String(err2);
+      }
+    } else {
+      out.usb = "unsupported";
+    }
+
+    if (navigator.bluetooth && navigator.bluetooth.getAvailability) {
+      try {
+        out.bluetooth_available = await navigator.bluetooth.getAvailability();
+      } catch (err3) {
+        out.bluetooth_error = err3.message || String(err3);
+      }
+    } else {
+      out.bluetooth = "unsupported";
+    }
+
+    return out;
   }
 
   function collectWebGl() {
@@ -236,6 +355,33 @@
       unmasked_renderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null,
       extensions: gl.getSupportedExtensions() || []
     });
+  }
+
+  async function collectWebGpu() {
+    var out = { supported: "gpu" in navigator };
+    if (!out.supported || !navigator.gpu || !navigator.gpu.requestAdapter) return out;
+    try {
+      var adapter = await navigator.gpu.requestAdapter();
+      out.adapter_available = Boolean(adapter);
+      if (!adapter) return out;
+      out.features = adapter.features ? Array.from(adapter.features).sort() : [];
+      out.limits = adapter.limits ? {
+        maxTextureDimension1D: adapter.limits.maxTextureDimension1D,
+        maxTextureDimension2D: adapter.limits.maxTextureDimension2D,
+        maxTextureDimension3D: adapter.limits.maxTextureDimension3D,
+        maxBindGroups: adapter.limits.maxBindGroups,
+        maxComputeWorkgroupSizeX: adapter.limits.maxComputeWorkgroupSizeX,
+        maxComputeWorkgroupSizeY: adapter.limits.maxComputeWorkgroupSizeY,
+        maxComputeWorkgroupSizeZ: adapter.limits.maxComputeWorkgroupSizeZ
+      } : null;
+      if (adapter.info) out.info = adapter.info;
+      if (adapter.requestAdapterInfo) {
+        try { out.adapter_info = await adapter.requestAdapterInfo(); } catch (errInfo) { out.adapter_info_error = errInfo.message || String(errInfo); }
+      }
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
   }
 
   function collectWebRtc() {
@@ -270,6 +416,115 @@
       broadcast_channel: "BroadcastChannel" in window,
       beacon: Boolean(navigator.sendBeacon)
     });
+  }
+
+  function collectFrameAndPolicySurface() {
+    var iframe = document.createElement("iframe");
+    var sandboxTokens = [
+      "allow-downloads",
+      "allow-forms",
+      "allow-modals",
+      "allow-orientation-lock",
+      "allow-pointer-lock",
+      "allow-popups",
+      "allow-popups-to-escape-sandbox",
+      "allow-presentation",
+      "allow-same-origin",
+      "allow-scripts",
+      "allow-storage-access-by-user-activation",
+      "allow-top-navigation",
+      "allow-top-navigation-by-user-activation"
+    ];
+    var sandboxSupport = {};
+    sandboxTokens.forEach(function (token) {
+      try {
+        iframe.sandbox.add(token);
+        sandboxSupport[token] = iframe.sandbox.contains(token);
+      } catch (err) {
+        sandboxSupport[token] = false;
+      }
+    });
+    return Promise.resolve({
+      iframe_srcdoc: "srcdoc" in iframe,
+      iframe_credentialless: "credentialless" in iframe,
+      iframe_csp: "csp" in iframe,
+      sandbox_tokens: sandboxSupport,
+      document_policy: document.policy ? {
+        allowed_features: document.policy.allowedFeatures ? document.policy.allowedFeatures() : null
+      } : null,
+      permissions_policy: document.permissionsPolicy ? {
+        allowed_features: document.permissionsPolicy.allowedFeatures ? document.permissionsPolicy.allowedFeatures() : null
+      } : null,
+      user_activation: navigator.userActivation ? {
+        is_active: navigator.userActivation.isActive,
+        has_been_active: navigator.userActivation.hasBeenActive
+      } : null
+    });
+  }
+
+  function collectPatchCandidateMatrix() {
+    var ua = navigator.userAgent || "";
+    var major = parseChromiumMajor(ua);
+    var highRisk = {
+      angle_webgl: Boolean(document.createElement("canvas").getContext("webgl") || document.createElement("canvas").getContext("webgl2")),
+      dawn_webgpu: "gpu" in navigator,
+      webaudio: "AudioContext" in window || "webkitAudioContext" in window,
+      visuals_rendering: true,
+      v8_wasm: typeof WebAssembly !== "undefined",
+      webaudio_worklet: Boolean(window.AudioContext && AudioContext.prototype && "audioWorklet" in AudioContext.prototype),
+      webrtc: "RTCPeerConnection" in window
+    };
+    var candidates = [
+      {
+        area: "ANGLE / graphics",
+        relevant_exposure: highRisk.angle_webgl,
+        examples: ["CVE-2024-4058", "CVE-2024-4558"],
+        why: "WebGL/WebGL2 and ANGLE-backed GPU rendering are exposed."
+      },
+      {
+        area: "Dawn / WebGPU",
+        relevant_exposure: highRisk.dawn_webgpu,
+        examples: ["CVE-2024-4368"],
+        why: "WebGPU is exposed, so Dawn patch level matters."
+      },
+      {
+        area: "Visuals",
+        relevant_exposure: true,
+        examples: ["CVE-2024-4671"],
+        why: "The browser renders arbitrary web content; exact patched build is needed because this was exploited in the wild."
+      },
+      {
+        area: "WebAudio",
+        relevant_exposure: highRisk.webaudio,
+        examples: ["CVE-2024-4559"],
+        why: "WebAudio API is present in Chromium-class browsers and should be included in patch review."
+      },
+      {
+        area: "V8 / WebAssembly",
+        relevant_exposure: highRisk.v8_wasm,
+        examples: ["CVE-2024-3833"],
+        why: "JavaScript and WebAssembly are core exposed attack surface."
+      },
+      {
+        area: "WebRTC",
+        relevant_exposure: highRisk.webrtc,
+        examples: ["CVE-2024-5493"],
+        why: "WebRTC is exposed and produced ICE candidates in prior testing."
+      }
+    ];
+    return Promise.resolve({
+      detected_chromium_major: major,
+      user_agent: ua,
+      exact_build_required: true,
+      assessment: major && major <= 124 ? "Chromium 124 or older: prioritize exact build discovery and vendor patch confirmation." : "Major version alone does not prove vulnerable; exact build and vendor patches are still required.",
+      no_exploit_payloads_run: true,
+      candidates: candidates
+    });
+  }
+
+  function parseChromiumMajor(ua) {
+    var match = ua.match(/(?:Chrome|Chromium)\/(\d+)/i);
+    return match ? Number(match[1]) : null;
   }
 
   async function testInternalSchemes() {

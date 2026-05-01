@@ -281,6 +281,15 @@ textarea {
   margin-bottom: 14px;
 }
 
+.compact-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .result {
   color: var(--accent-2);
   margin-top: 12px;

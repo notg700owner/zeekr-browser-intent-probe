@@ -12,14 +12,14 @@
     <div>
       <p class="eyebrow">Authorised defensive assessment</p>
       <h1>Zeekr Browser Intent Probe</h1>
-      <p class="build-meta">Version <strong id="appVersion">1.2.0</strong> · Build <strong id="buildDate">2026-04-29T15:45:00Z</strong></p>
+      <p class="build-meta">Version <strong id="appVersion">1.3.0</strong> · Build <strong id="buildDate">2026-05-01T16:57:02Z</strong></p>
     </div>
     <div class="status-pill" id="storageStatus">Storage: checking</div>
   </header>
 
   <section class="safety-banner">
     <strong>Privacy / Safety:</strong>
-    This page does not exploit the browser or automatically open apps/settings. It fingerprints browser capabilities and saves logs to the shared Cloudflare server log for authorised review.
+    This page does not exploit the browser or automatically open apps/settings. It fingerprints browser capabilities, maps patch candidates without exploit payloads, and saves logs to the shared Cloudflare server log for authorised review.
   </section>
 
   <nav class="tabs" aria-label="Main tabs">
@@ -33,14 +33,32 @@
         <div class="section-heading">
           <div>
             <p class="eyebrow">One Button Browser Assessment</p>
-            <h2>Chromium Fingerprint & Capability Probe</h2>
+            <h2>Chromium Fingerprint & Patch Candidate Probe</h2>
           </div>
           <div class="button-row large">
             <button type="button" class="primary" data-action="run-full-probe">Run browser probe</button>
           </div>
         </div>
-        <p class="hint">Runs non-destructive checks for Chromium version hints, sandbox/admin surfaces, storage, downloads, permissions, Web APIs, WebGL, WebRTC support, and internal scheme handling. Results stream to the shared server log.</p>
+        <p class="hint">Runs non-destructive checks for Chromium version/build hints, Cloudflare-observed client info, storage persistence, permissions, Web APIs, graphics surfaces, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
         <div class="result" id="probeStatus">Ready.</div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Patch Candidate Coverage</p>
+            <h2>What This Probe Looks For</h2>
+          </div>
+        </div>
+        <p class="warning">These checks do not attempt exploitation. They only identify exposed browser subsystems where exact Chromium build and vendor patch status matter.</p>
+        <ul class="compact-list">
+          <li>ANGLE / WebGL graphics exposure</li>
+          <li>Dawn / WebGPU exposure</li>
+          <li>V8 / WebAssembly exposure</li>
+          <li>WebAudio, WebRTC, permissions, and device API surfaces</li>
+          <li>Service worker, Cache API, iframe sandbox, and policy behavior</li>
+          <li>Cloudflare-observed network/TLS/client-hint metadata</li>
+        </ul>
       </section>
 
       <section class="panel">

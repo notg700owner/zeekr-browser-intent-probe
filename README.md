@@ -2,7 +2,7 @@
 
 A defensive, single-page browser probe for an authorised Zeekr 9X rear-screen Chromium / VM assessment.
 
-The current pass focuses on what the rear browser itself exposes: Chromium version hints, platform identity, storage, download support, permissions, Web APIs, WebGL, WebRTC, service worker/cache availability, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
+The current pass focuses on what the rear browser itself exposes: Chromium version/build hints, platform identity, Cloudflare-observed network/TLS metadata, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, service worker/cache availability, frame policy behavior, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
 
 Live deployment:
 
@@ -10,15 +10,16 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.2.0`
+Current probe version: `1.3.0`
 
-Build date: `2026-04-29T15:45:00Z`
+Build date: `2026-05-01T16:57:02Z`
 
 ## Safety Model
 
 - This page does not exploit the browser.
 - This page does not automatically open apps or settings.
-- The one-button probe only runs non-destructive browser capability checks.
+- The one-button probe only runs non-destructive browser capability and patch-candidate exposure checks.
+- The vulnerability-oriented checks map exposed subsystems; they do not include exploit payloads or crash tests.
 - Manual `chrome://` links require a visible tap and do not change settings.
 - Logs are saved to the authorised Cloudflare Worker/KV backend so the car browser and Mac browser can see the same stream.
 - A local browser copy is kept as a fallback if the server log is unavailable.
@@ -98,6 +99,7 @@ Useful endpoints:
 
 ```text
 /api/status
+/api/client-info
 /api/log
 /api/logs
 /api/clear
@@ -120,9 +122,21 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 - Download capability checks show browser support for constructing downloads, not a guarantee that the car browser UI will allow saving files.
 - Storage results show whether `localStorage`, `sessionStorage`, cookies, IndexedDB, and cache APIs are available in the VM browser.
 - Permission results show what the browser exposes through the Permissions API; they do not request dangerous access.
-- WebGL and WebRTC results help fingerprint graphics/network stack exposure.
+- WebGL, WebGPU, WebAudio, WebAssembly, and WebRTC results help map which Chromium subsystems are exposed and therefore should be checked against the vendor's exact patch level.
+- The patch candidate matrix is not a vulnerability verdict. It marks areas where exact Chromium build and vendor backport status are required.
+- `/api/client-info` records what Cloudflare observes from the browser request, including network/TLS/client-hint metadata where available.
 - `chrome://` links opening successfully may reveal useful version, sandbox, GPU, policy, download, or crash pages.
 - Nothing happens on an internal link usually means the browser filters it or the embedded Chromium shell blocks that surface.
+
+## Patch Candidate Context
+
+The probe highlights exposed subsystems related to known Chromium 124-era security update areas, including ANGLE/WebGL, Dawn/WebGPU, Visuals/rendering, WebAudio, V8/WebAssembly, and WebRTC. These checks are for patch triage only. A positive exposure means "verify exact build and patches", not "confirmed vulnerable".
+
+Reference starting points:
+
+- Chrome 124 release notes: https://developer.chrome.com/release-notes/124
+- Chrome 124 desktop security update with CVE-2024-4671: https://chromereleases.googleblog.com/2024/05/stable-channel-update-for-desktop_9.html
+- Chrome 124 desktop security update with ANGLE/Dawn fixes: https://chromereleases.googleblog.com/2024/04/stable-channel-update-for-desktop_24.html
 
 ## Troubleshooting
 
