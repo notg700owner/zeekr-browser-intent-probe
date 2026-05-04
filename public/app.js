@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v3";
-  var APP_VERSION = "1.3.0";
-  var BUILD_DATE = "2026-05-01T16:57:02Z";
+  var STORAGE_KEY = "zbip.report.v4";
+  var APP_VERSION = "1.4.0";
+  var BUILD_DATE = "2026-05-04T17:36:35Z";
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
   var serverLogs = [];
@@ -95,8 +95,15 @@
       ["Permissions API snapshot", collectPermissions],
       ["High-risk web APIs", collectHighRiskApis],
       ["Non-prompt device surface snapshot", collectDeviceSurfaces],
+      ["Visuals compositor smoke", collectVisualsCompositorSmoke],
+      ["Canvas and image surface", collectCanvasAndImageSurface],
       ["WebGL fingerprint", collectWebGl],
       ["WebGPU adapter snapshot", collectWebGpu],
+      ["V8 and WebAssembly smoke", collectV8AndWasmSmoke],
+      ["WebAudio smoke", collectWebAudioSmoke],
+      ["Codecs and media surface", collectCodecsAndMediaSurface],
+      ["Sensors and hardware surface", collectSensorsAndHardwareSurface],
+      ["Network and fetch policy surface", collectNetworkAndFetchPolicySurface],
       ["WebRTC support", collectWebRtc],
       ["Service worker and cache", collectWorkerAndCache],
       ["Frame and policy surface", collectFrameAndPolicySurface],
@@ -286,8 +293,12 @@
       credential_management: "credentials" in navigator,
       idle_detection: "IdleDetector" in window,
       file_system_access: "showOpenFilePicker" in window || "showSaveFilePicker" in window,
+      origin_private_file_system: Boolean(navigator.storage && navigator.storage.getDirectory),
       launch_queue: "launchQueue" in window,
       serial: "serial" in navigator,
+      webauthn: "PublicKeyCredential" in window,
+      webcodecs: "VideoEncoder" in window || "ImageDecoder" in window,
+      compression_streams: "CompressionStream" in window && "DecompressionStream" in window,
       wake_lock: "wakeLock" in navigator,
       device_memory: navigator.deviceMemory || null,
       hardware_concurrency: navigator.hardwareConcurrency || null
@@ -340,6 +351,92 @@
     return out;
   }
 
+  async function collectVisualsCompositorSmoke() {
+    var out = {
+      note: "Non-exploit rendering/compositor smoke test. It exercises common Visuals paths without memory-corruption payloads."
+    };
+    var box = document.createElement("div");
+    box.style.cssText = [
+      "position:fixed",
+      "left:-9999px",
+      "top:-9999px",
+      "width:128px",
+      "height:128px",
+      "background:linear-gradient(45deg,#45d6b5,#7cc8ff)",
+      "transform:translateZ(0) rotate(7deg) scale(1.05)",
+      "filter:blur(0.2px) contrast(1.1)",
+      "clip-path:polygon(0 0,100% 8%,92% 100%,8% 92%)",
+      "contain:layout paint style",
+      "will-change:transform,filter,opacity",
+      "opacity:0.92"
+    ].join(";");
+    var child = document.createElement("div");
+    child.style.cssText = "width:64px;height:64px;margin:24px;background:rgba(255,255,255,.35);mix-blend-mode:screen;border-radius:8px;";
+    box.appendChild(child);
+    document.body.appendChild(box);
+    try {
+      var first = box.getBoundingClientRect();
+      box.animate([
+        { transform: "translateZ(0) rotate(7deg) scale(1.05)", opacity: 0.92 },
+        { transform: "translate3d(2px,1px,0) rotate(13deg) scale(0.98)", opacity: 0.75 }
+      ], { duration: 120, iterations: 1, fill: "both" });
+      await nextAnimationFrame();
+      await nextAnimationFrame();
+      var second = box.getBoundingClientRect();
+      out.css_supports = {
+        transform_3d: window.CSS && CSS.supports ? CSS.supports("transform", "translateZ(0)") : null,
+        filter: window.CSS && CSS.supports ? CSS.supports("filter", "blur(1px)") : null,
+        clip_path: window.CSS && CSS.supports ? CSS.supports("clip-path", "circle(40%)") : null,
+        contain_paint: window.CSS && CSS.supports ? CSS.supports("contain", "paint") : null
+      };
+      out.web_animations = "animate" in Element.prototype;
+      out.initial_rect = rectToObject(first);
+      out.after_animation_rect = rectToObject(second);
+      out.completed = true;
+    } catch (err) {
+      out.error = err.message || String(err);
+    } finally {
+      box.remove();
+    }
+    return out;
+  }
+
+  async function collectCanvasAndImageSurface() {
+    var out = {};
+    try {
+      var canvas = document.createElement("canvas");
+      canvas.width = 96;
+      canvas.height = 96;
+      var ctx = canvas.getContext("2d");
+      out.canvas2d = Boolean(ctx);
+      if (ctx) {
+        var gradient = ctx.createLinearGradient(0, 0, 96, 96);
+        gradient.addColorStop(0, "#45d6b5");
+        gradient.addColorStop(1, "#7cc8ff");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 96, 96);
+        ctx.globalCompositeOperation = "multiply";
+        ctx.fillStyle = "rgba(255, 209, 102, 0.7)";
+        ctx.arc(48, 48, 28, 0, Math.PI * 2);
+        ctx.fill();
+        var data = ctx.getImageData(0, 0, 96, 96);
+        out.canvas_hash_sha256 = await digestBytes(data.data);
+      }
+      out.to_blob = "toBlob" in canvas;
+      out.create_image_bitmap = "createImageBitmap" in window;
+      out.offscreencanvas = "OffscreenCanvas" in window;
+      if ("OffscreenCanvas" in window) {
+        var offscreen = new OffscreenCanvas(32, 32);
+        var offctx = offscreen.getContext("2d");
+        out.offscreencanvas_2d = Boolean(offctx);
+        out.offscreencanvas_webgl = Boolean(offscreen.getContext("webgl"));
+      }
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
+  }
+
   function collectWebGl() {
     var canvas = document.createElement("canvas");
     var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
@@ -380,6 +477,143 @@
       }
     } catch (err) {
       out.error = err.message || String(err);
+    }
+    return out;
+  }
+
+  async function collectV8AndWasmSmoke() {
+    var out = {
+      note: "Non-exploit JS/WASM smoke test. It validates that V8/WASM paths are reachable, not that a CVE is present."
+    };
+    try {
+      out.bigint = typeof BigInt !== "undefined";
+      out.structured_clone = "structuredClone" in window;
+      out.finalization_registry = "FinalizationRegistry" in window;
+      out.weak_ref = "WeakRef" in window;
+      out.atomics = "Atomics" in window;
+      out.shared_array_buffer = typeof SharedArrayBuffer !== "undefined";
+      out.wasm_supported = typeof WebAssembly !== "undefined";
+      if (typeof WebAssembly !== "undefined") {
+        var bytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+        out.wasm_validate_empty_module = WebAssembly.validate(bytes);
+        var mod = await WebAssembly.compile(bytes);
+        var instance = await WebAssembly.instantiate(mod);
+        out.wasm_compile_instantiate = Boolean(instance);
+      }
+      var arr = Array.from({ length: 2048 }, function (_, i) { return (i * 2654435761) >>> 0; });
+      arr.sort(function (a, b) { return (a & 255) - (b & 255); });
+      out.array_sort_smoke = arr.length === 2048;
+      out.regex_unicode_sets = safeRegexFeature("[\\p{ASCII}&&\\p{Letter}]", "v");
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
+  }
+
+  async function collectWebAudioSmoke() {
+    var out = {
+      supported: "AudioContext" in window || "webkitAudioContext" in window,
+      offline_supported: "OfflineAudioContext" in window || "webkitOfflineAudioContext" in window,
+      note: "Uses OfflineAudioContext only; it should not play sound."
+    };
+    var Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!Offline) return out;
+    try {
+      var ctx = new Offline(1, 1024, 44100);
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = 440;
+      gain.gain.value = 0.05;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(0);
+      osc.stop(1024 / 44100);
+      var rendered = await ctx.startRendering();
+      var channel = rendered.getChannelData(0);
+      var sum = 0;
+      for (var i = 0; i < channel.length; i += 32) sum += Math.abs(channel[i]);
+      out.rendered = true;
+      out.length = rendered.length;
+      out.sample_rate = rendered.sampleRate;
+      out.sample_sum = Number(sum.toFixed(6));
+      out.audio_worklet = Boolean(window.AudioContext && AudioContext.prototype && "audioWorklet" in AudioContext.prototype);
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
+  }
+
+  function collectCodecsAndMediaSurface() {
+    return Promise.resolve({
+      media_source: "MediaSource" in window,
+      managed_media_source: "ManagedMediaSource" in window,
+      media_recorder: "MediaRecorder" in window,
+      video_encoder: "VideoEncoder" in window,
+      video_decoder: "VideoDecoder" in window,
+      audio_encoder: "AudioEncoder" in window,
+      audio_decoder: "AudioDecoder" in window,
+      image_decoder: "ImageDecoder" in window,
+      video_frame: "VideoFrame" in window,
+      encoded_video_chunk: "EncodedVideoChunk" in window,
+      picture_in_picture: "pictureInPictureEnabled" in document,
+      remote_playback: "RemotePlayback" in window,
+      eme_request_media_key_system_access: "requestMediaKeySystemAccess" in navigator,
+      mime_support: {
+        webm_vp8: window.MediaSource && MediaSource.isTypeSupported ? MediaSource.isTypeSupported('video/webm; codecs="vp8"') : null,
+        webm_vp9: window.MediaSource && MediaSource.isTypeSupported ? MediaSource.isTypeSupported('video/webm; codecs="vp9"') : null,
+        mp4_h264: window.MediaSource && MediaSource.isTypeSupported ? MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"') : null
+      }
+    });
+  }
+
+  function collectSensorsAndHardwareSurface() {
+    return Promise.resolve({
+      device_orientation_event: "DeviceOrientationEvent" in window,
+      device_motion_event: "DeviceMotionEvent" in window,
+      ambient_light_sensor: "AmbientLightSensor" in window,
+      accelerometer: "Accelerometer" in window,
+      linear_acceleration_sensor: "LinearAccelerationSensor" in window,
+      gyroscope: "Gyroscope" in window,
+      magnetometer: "Magnetometer" in window,
+      absolute_orientation_sensor: "AbsoluteOrientationSensor" in window,
+      relative_orientation_sensor: "RelativeOrientationSensor" in window,
+      geolocation: "geolocation" in navigator,
+      vibration: "vibrate" in navigator,
+      battery_api: "getBattery" in navigator,
+      gamepad_api: "getGamepads" in navigator,
+      max_touch_points: navigator.maxTouchPoints || 0,
+      device_memory: navigator.deviceMemory || null,
+      hardware_concurrency: navigator.hardwareConcurrency || null
+    });
+  }
+
+  async function collectNetworkAndFetchPolicySurface() {
+    var out = {
+      fetch: "fetch" in window,
+      beacon: Boolean(navigator.sendBeacon),
+      websocket: "WebSocket" in window,
+      event_source: "EventSource" in window,
+      webtransport: "WebTransport" in window,
+      web_socket_stream: "WebSocketStream" in window,
+      compression_stream: "CompressionStream" in window,
+      decompression_stream: "DecompressionStream" in window,
+      trusted_types: "trustedTypes" in window,
+      cross_origin_isolated: window.crossOriginIsolated,
+      referrer_policy: document.referrerPolicy || "",
+      do_not_track: navigator.doNotTrack || ""
+    };
+    try {
+      var response = await fetch("/api/status?network_probe=" + Date.now(), { cache: "no-store", credentials: "same-origin" });
+      out.same_origin_fetch = {
+        ok: response.ok,
+        status: response.status,
+        content_type: response.headers.get("content-type") || "",
+        accept_ch: response.headers.get("accept-ch") || "",
+        permissions_policy: response.headers.get("permissions-policy") || ""
+      };
+    } catch (err) {
+      out.same_origin_fetch_error = err.message || String(err);
     }
     return out;
   }
@@ -478,13 +712,13 @@
       {
         area: "ANGLE / graphics",
         relevant_exposure: highRisk.angle_webgl,
-        examples: ["CVE-2024-4058", "CVE-2024-4558"],
+        examples: ["CVE-2024-4058"],
         why: "WebGL/WebGL2 and ANGLE-backed GPU rendering are exposed."
       },
       {
         area: "Dawn / WebGPU",
         relevant_exposure: highRisk.dawn_webgpu,
-        examples: ["CVE-2024-4368"],
+        examples: ["CVE-2024-4060"],
         why: "WebGPU is exposed, so Dawn patch level matters."
       },
       {
@@ -496,20 +730,20 @@
       {
         area: "WebAudio",
         relevant_exposure: highRisk.webaudio,
-        examples: ["CVE-2024-4559"],
-        why: "WebAudio API is present in Chromium-class browsers and should be included in patch review."
+        examples: [],
+        why: "WebAudio API is present and should be included in broader Chromium patch review."
       },
       {
         area: "V8 / WebAssembly",
         relevant_exposure: highRisk.v8_wasm,
-        examples: ["CVE-2024-3833"],
-        why: "JavaScript and WebAssembly are core exposed attack surface."
+        examples: ["CVE-2024-4059"],
+        why: "JavaScript and WebAssembly are core exposed attack surface; Chrome 124 fixed a V8 API issue."
       },
       {
         area: "WebRTC",
         relevant_exposure: highRisk.webrtc,
-        examples: ["CVE-2024-5493"],
-        why: "WebRTC is exposed and produced ICE candidates in prior testing."
+        examples: [],
+        why: "WebRTC is exposed and produced ICE candidates in prior testing; include it in network/privacy and patch review."
       }
     ];
     return Promise.resolve({
@@ -525,6 +759,35 @@
   function parseChromiumMajor(ua) {
     var match = ua.match(/(?:Chrome|Chromium)\/(\d+)/i);
     return match ? Number(match[1]) : null;
+  }
+
+  function nextAnimationFrame() {
+    return new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
+  }
+
+  function rectToObject(rect) {
+    return {
+      x: Number(rect.x.toFixed(3)),
+      y: Number(rect.y.toFixed(3)),
+      width: Number(rect.width.toFixed(3)),
+      height: Number(rect.height.toFixed(3))
+    };
+  }
+
+  async function digestBytes(bytes) {
+    if (!crypto || !crypto.subtle || !crypto.subtle.digest) return "webcrypto unavailable";
+    var digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map(function (value) {
+      return value.toString(16).padStart(2, "0");
+    }).join("");
+  }
+
+  function safeRegexFeature(pattern, flags) {
+    try {
+      return Boolean(new RegExp(pattern, flags));
+    } catch (err) {
+      return false;
+    }
   }
 
   async function testInternalSchemes() {

@@ -2,7 +2,7 @@
 
 A defensive, single-page browser probe for an authorised Zeekr 9X rear-screen Chromium / VM assessment.
 
-The current pass focuses on what the rear browser itself exposes: Chromium version/build hints, platform identity, Cloudflare-observed network/TLS metadata, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, service worker/cache availability, frame policy behavior, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
+The current pass focuses on what the rear browser itself exposes: Chromium version/build hints, platform identity, Cloudflare-observed network/TLS metadata, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, WebAudio, V8/WASM, codecs/media, sensors/hardware surfaces, service worker/cache availability, frame policy behavior, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
 
 Live deployment:
 
@@ -10,15 +10,15 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.3.0`
+Current probe version: `1.4.0`
 
-Build date: `2026-05-01T16:57:02Z`
+Build date: `2026-05-04T17:36:35Z`
 
 ## Safety Model
 
 - This page does not exploit the browser.
 - This page does not automatically open apps or settings.
-- The one-button probe only runs non-destructive browser capability and patch-candidate exposure checks.
+- The one-button probe runs non-destructive max-coverage browser capability and patch-candidate exposure checks.
 - The vulnerability-oriented checks map exposed subsystems; they do not include exploit payloads or crash tests.
 - Manual `chrome://` links require a visible tap and do not change settings.
 - Logs are saved to the authorised Cloudflare Worker/KV backend so the car browser and Mac browser can see the same stream.
@@ -123,6 +123,7 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 - Storage results show whether `localStorage`, `sessionStorage`, cookies, IndexedDB, and cache APIs are available in the VM browser.
 - Permission results show what the browser exposes through the Permissions API; they do not request dangerous access.
 - WebGL, WebGPU, WebAudio, WebAssembly, and WebRTC results help map which Chromium subsystems are exposed and therefore should be checked against the vendor's exact patch level.
+- Visuals/compositor, canvas/image, codecs/media, sensors, network policy, and iframe-policy smoke tests broaden subsystem coverage without exploit payloads.
 - The patch candidate matrix is not a vulnerability verdict. It marks areas where exact Chromium build and vendor backport status are required.
 - `/api/client-info` records what Cloudflare observes from the browser request, including network/TLS/client-hint metadata where available.
 - `chrome://` links opening successfully may reveal useful version, sandbox, GPU, policy, download, or crash pages.
@@ -130,7 +131,7 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 
 ## Patch Candidate Context
 
-The probe highlights exposed subsystems related to known Chromium 124-era security update areas, including ANGLE/WebGL, Dawn/WebGPU, Visuals/rendering, WebAudio, V8/WebAssembly, and WebRTC. These checks are for patch triage only. A positive exposure means "verify exact build and patches", not "confirmed vulnerable".
+The probe highlights exposed subsystems related to known Chromium 124-era security update areas, including ANGLE/WebGL, Dawn/WebGPU, Visuals/rendering, V8/WebAssembly, WebAudio, codecs/media, and WebRTC. These checks are for patch triage only. A positive exposure means "verify exact build and patches", not "confirmed vulnerable".
 
 Reference starting points:
 

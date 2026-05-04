@@ -38,7 +38,7 @@ export default {
       return logsCsv(env);
     }
 
-    return env.STATIC_ASSETS.fetch(request);
+    return withProbeHeaders(await env.STATIC_ASSETS.fetch(request));
   }
 };
 
@@ -169,7 +169,7 @@ function csvEscape(value) {
 }
 
 function json(value, status = 200) {
-  return new Response(JSON.stringify(value), {
+  return withProbeHeaders(new Response(JSON.stringify(value), {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8",
@@ -177,5 +177,26 @@ function json(value, status = 200) {
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type"
     }
+  }));
+}
+
+function withProbeHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.set("Accept-CH", [
+    "Sec-CH-UA",
+    "Sec-CH-UA-Full-Version",
+    "Sec-CH-UA-Full-Version-List",
+    "Sec-CH-UA-Platform",
+    "Sec-CH-UA-Platform-Version",
+    "Sec-CH-UA-Arch",
+    "Sec-CH-UA-Bitness",
+    "Sec-CH-UA-Model",
+    "Sec-CH-UA-Mobile"
+  ].join(", "));
+  headers.set("Cache-Control", headers.get("Cache-Control") || "no-store");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
   });
 }
