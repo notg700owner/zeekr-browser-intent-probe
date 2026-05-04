@@ -2,11 +2,12 @@ name = "zeekr-browser-intent-probe"
 compatibility_date = "2026-04-29"
 main = "./src/worker.js"
 
-# Static assets are served from `public`; `/api/*` is handled by `src/worker.js`.
+# Static assets are served from `public`; all requests pass through the Worker
+# so probe headers such as Accept-CH are attached to the HTML entry point.
 [assets]
 directory = "./public"
 binding = "STATIC_ASSETS"
-run_worker_first = ["/api/*"]
+run_worker_first = ["/*"]
 
 [[kv_namespaces]]
 binding = "LOGS_KV"
