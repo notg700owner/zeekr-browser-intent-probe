@@ -12,7 +12,7 @@
     <div>
       <p class="eyebrow">Authorised defensive assessment</p>
       <h1>Zeekr Browser Intent Probe</h1>
-      <p class="build-meta">Version <strong id="appVersion">1.4.0</strong> · Build <strong id="buildDate">2026-05-04T17:36:35Z</strong></p>
+      <p class="build-meta">Version <strong id="appVersion">1.5.0</strong> · Build <strong id="buildDate">2026-05-05T11:36:34Z</strong></p>
     </div>
     <div class="status-pill" id="storageStatus">Storage: checking</div>
   </header>
@@ -39,8 +39,27 @@
             <button type="button" class="primary" data-action="run-full-probe">Run browser probe</button>
           </div>
         </div>
-        <p class="hint">Runs non-destructive max-coverage checks for Chromium version/build hints, Cloudflare-observed client info, storage persistence, permissions, Web APIs, graphics/compositor surfaces, WebAudio, WASM/V8, codecs, sensors, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
+        <p class="hint">Runs non-destructive max-coverage checks for Chromium version/build thresholds, Cloudflare-observed client info, sandbox/process evidence gaps, storage persistence, permissions, Web APIs, graphics/compositor surfaces, WebAudio, WASM/V8, codecs, sensors, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
         <div class="result" id="probeStatus">Ready.</div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Chain Viability Test</p>
+            <h2>Renderer To Shell / ADB Evidence</h2>
+          </div>
+          <div class="button-row">
+            <button type="button" data-action="save-chain-evidence">Save chain evidence</button>
+          </div>
+        </div>
+        <p class="warning">The page can compare visible Chromium versions and map exposed browser surfaces. UID, SELinux domain, privileged vendor permissions, process isolation, and IPC exposure require manual evidence from chrome:// pages, shell/ADB, or an authorised recon APK.</p>
+        <ul class="compact-list">
+          <li>Auto: exact visible Chromium version and comparison against 124.0.6367.60, 124.0.6367.201, and 124.0.6367.207.</li>
+          <li>Manual: chrome://version, chrome://sandbox, chrome://gpu, command line flags, process list, UID, SELinux context, package permissions, and exposed IPC surfaces.</li>
+          <li>Goal: decide whether a renderer compromise would plausibly reach privileged browser, GPU/Viz, vendor IPC, shell, or ADB/debug surfaces.</li>
+        </ul>
+        <textarea id="chainEvidence" rows="8" placeholder="Paste or type manual evidence here: chrome://version output, chrome://sandbox status, chrome://gpu notes, ps/procfs output, UID, SELinux domain, package permissions, IPC observations"></textarea>
       </section>
 
       <section class="panel">

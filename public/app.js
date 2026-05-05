@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v4";
-  var APP_VERSION = "1.4.0";
-  var BUILD_DATE = "2026-05-04T17:36:35Z";
+  var STORAGE_KEY = "zbip.report.v5";
+  var APP_VERSION = "1.5.0";
+  var BUILD_DATE = "2026-05-05T11:36:34Z";
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
   var serverLogs = [];
@@ -14,7 +14,8 @@
     updated_at: new Date().toISOString(),
     environment: {},
     logs: [],
-    notes: ""
+    notes: "",
+    chain_evidence: ""
   };
 
   var chromeSurfaces = [
@@ -66,6 +67,7 @@
       if (action === "run-full-probe") return runFullProbe();
       if (action === "refresh-env") return handleAction("session", "Refresh environment", "", "tap", refreshEnvironment);
       if (action === "copy-env") return handleAction("session", "Copy environment", "", "tap", function () { return copyText(JSON.stringify(state.environment, null, 2)); });
+      if (action === "save-chain-evidence") return saveChainEvidence();
       if (action === "save-notes") return saveNotes();
       if (action === "copy-visible-log") return handleAction("report", "Copy visible log", "", "tap", function () { return copyText(JSON.stringify(getFilteredLogs(), null, 2)); });
       if (action === "download-log") return handleAction("report", "Download server log JSON", "", "tap", function () { downloadJson("zeekr-browser-intent-probe-server-log.json", serverLogs); });
@@ -88,6 +90,7 @@
       ["Chromium version hints", collectVersionHints],
       ["High entropy client hints", collectHighEntropyClientHints],
       ["Server observed client info", collectServerClientInfo],
+      ["Chain viability assessment", collectChainViabilityAssessment],
       ["Security context and isolation", collectSecurityContext],
       ["Storage and cookie capability", testStorageCapabilities],
       ["Cache persistence check", testCachePersistence],
@@ -179,6 +182,107 @@
     } catch (err) {
       return { ok: false, error: err.message || String(err) };
     }
+  }
+
+  async function collectChainViabilityAssessment() {
+    var versionInfo = await collectBestVersionInfo();
+    var thresholds = [
+      "124.0.6367.60",
+      "124.0.6367.201",
+      "124.0.6367.207"
+    ];
+    var comparisons = {};
+    thresholds.forEach(function (threshold) {
+      comparisons[threshold] = compareVersionForReport(versionInfo.best_version, threshold);
+    });
+
+    return {
+      objective: "Assess whether a renderer compromise could plausibly progress toward shell/ADB/debug capability. This test does not attempt compromise.",
+      automatic_findings: {
+        best_visible_chromium_version: versionInfo.best_version,
+        version_sources: versionInfo.sources,
+        threshold_comparisons: comparisons,
+        user_agent: navigator.userAgent,
+        platform: navigator.platform || "",
+        webgl_available: Boolean(document.createElement("canvas").getContext("webgl") || document.createElement("canvas").getContext("webgl2")),
+        webgpu_exposed: "gpu" in navigator,
+        webrtc_exposed: "RTCPeerConnection" in window,
+        service_worker_exposed: "serviceWorker" in navigator,
+        webusb_exposed: "usb" in navigator,
+        webbluetooth_exposed: "bluetooth" in navigator,
+        shared_array_buffer_exposed: typeof SharedArrayBuffer !== "undefined",
+        cross_origin_isolated: window.crossOriginIsolated
+      },
+      chain_questions: [
+        chainQuestion(1, "Identify exact Chromium version", versionInfo.best_version ? "partial_auto" : "unknown", "Use high-entropy UA hints and chrome://version. UA may be frozen or vendor-masked."),
+        chainQuestion(2, "Before or after 124.0.6367.60", comparisons["124.0.6367.60"].status, comparisons["124.0.6367.60"].detail),
+        chainQuestion(3, "Before or after 124.0.6367.201", comparisons["124.0.6367.201"].status, comparisons["124.0.6367.201"].detail),
+        chainQuestion(4, "Before or after 124.0.6367.207", comparisons["124.0.6367.207"].status, comparisons["124.0.6367.207"].detail),
+        chainQuestion(5, "Determine whether OEM backported patches without changing visible version", "requires_oem_or_binary_evidence", "Needs OEM patch notes, SBOM, Chromium commit metadata, binary strings, package build date, or vendor confirmation."),
+        chainQuestion(6, "Determine whether browser uses normal Chromium sandboxing", "requires_manual_evidence", "Use chrome://sandbox and chrome://version command line. Web JS cannot prove sandbox status."),
+        chainQuestion(7, "Determine whether Viz/GPU/browser processes are isolated", "requires_manual_evidence", "Use chrome://gpu, chrome://process-internals if available, chrome://version command line, or shell ps/procfs evidence."),
+        chainQuestion(8, "Determine Android UID and SELinux domain", "requires_shell_or_authorised_apk", "Requires shell/ADB/recon APK. Browser JS cannot read Android UID, SELinux context, or /proc labels."),
+        chainQuestion(9, "Determine privileged vendor permissions", "requires_shell_or_authorised_apk", "Requires package manager dumps, manifest/privapp permissions, appops, or recon APK evidence."),
+        chainQuestion(10, "Determine whether renderer compromise exposes privileged IPC surfaces", "requires_architecture_review", "Requires process model, exposed Mojo/IPC services, SELinux policy, binder/socket access, and sandbox boundary review.")
+      ],
+      manual_evidence_currently_saved: state.chain_evidence || "",
+      no_exploit_payloads_run: true
+    };
+  }
+
+  async function collectBestVersionInfo() {
+    var sources = {};
+    var uaVersion = parseChromiumVersion(navigator.userAgent || "");
+    if (uaVersion) sources.user_agent = uaVersion;
+
+    if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+      try {
+        var hints = await navigator.userAgentData.getHighEntropyValues(["uaFullVersion", "fullVersionList", "brands"]);
+        sources.ua_full_version = hints.uaFullVersion || "";
+        if (Array.isArray(hints.fullVersionList)) {
+          sources.full_version_list = hints.fullVersionList;
+        }
+      } catch (err) {
+        sources.high_entropy_error = err.message || String(err);
+      }
+    }
+
+    var candidates = [];
+    if (sources.ua_full_version) candidates.push(sources.ua_full_version);
+    if (Array.isArray(sources.full_version_list)) {
+      sources.full_version_list.forEach(function (item) {
+        if (item && /Chrom(e|ium)/i.test(item.brand || "") && item.version) candidates.push(item.version);
+      });
+    }
+    if (sources.user_agent) candidates.push(sources.user_agent);
+
+    var best = candidates.find(function (value) {
+      var parts = parseVersionParts(value);
+      return parts && parts.length >= 4 && parts[1] !== 0;
+    }) || candidates[0] || "";
+    return { best_version: best, sources: sources };
+  }
+
+  function compareVersionForReport(candidate, threshold) {
+    if (!candidate) {
+      return { status: "unknown", detail: "No visible Chromium version was available." };
+    }
+    var cmp = compareVersions(candidate, threshold);
+    if (cmp == null) {
+      return { status: "unknown", detail: "Could not parse visible version " + candidate + " against " + threshold + "." };
+    }
+    if (cmp < 0) return { status: "before", detail: candidate + " is before " + threshold + " based on visible version only." };
+    if (cmp > 0) return { status: "after", detail: candidate + " is after " + threshold + " based on visible version only." };
+    return { status: "equal", detail: candidate + " equals " + threshold + " based on visible version only." };
+  }
+
+  function chainQuestion(id, question, status, evidenceNeeded) {
+    return {
+      id: id,
+      question: question,
+      status: status,
+      evidence_needed: evidenceNeeded
+    };
   }
 
   function collectSecurityContext() {
@@ -761,6 +865,30 @@
     return match ? Number(match[1]) : null;
   }
 
+  function parseChromiumVersion(text) {
+    var match = String(text || "").match(/(?:Chrome|Chromium)\/(\d+(?:\.\d+){0,3})/i);
+    return match ? match[1] : "";
+  }
+
+  function parseVersionParts(version) {
+    var clean = String(version || "").trim();
+    if (!/^\d+(?:\.\d+){0,3}$/.test(clean)) return null;
+    var parts = clean.split(".").map(function (part) { return Number(part); });
+    while (parts.length < 4) parts.push(0);
+    return parts.slice(0, 4);
+  }
+
+  function compareVersions(a, b) {
+    var pa = parseVersionParts(a);
+    var pb = parseVersionParts(b);
+    if (!pa || !pb) return null;
+    for (var i = 0; i < 4; i++) {
+      if (pa[i] < pb[i]) return -1;
+      if (pa[i] > pb[i]) return 1;
+    }
+    return 0;
+  }
+
   function nextAnimationFrame() {
     return new Promise(function (resolve) { requestAnimationFrame(function () { resolve(); }); });
   }
@@ -916,6 +1044,8 @@
       envInfo.appendChild(wrap);
     });
     document.getElementById("notes").value = state.notes || "";
+    var chainEvidence = document.getElementById("chainEvidence");
+    if (chainEvidence) chainEvidence.value = state.chain_evidence || "";
   }
 
   function renderLogs() {
@@ -1007,6 +1137,13 @@
     state.notes = document.getElementById("notes").value;
     saveState();
     logEvent("notes", "Save observations", "", "tap", "saved", "");
+  }
+
+  function saveChainEvidence() {
+    var field = document.getElementById("chainEvidence");
+    state.chain_evidence = field ? field.value : "";
+    saveState();
+    logEvent("chain", "Save manual chain evidence", "", "tap", "saved", state.chain_evidence);
   }
 
   function clearLog() {

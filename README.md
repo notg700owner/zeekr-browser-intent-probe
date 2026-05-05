@@ -2,7 +2,7 @@
 
 A defensive, single-page browser probe for an authorised Zeekr 9X rear-screen Chromium / VM assessment.
 
-The current pass focuses on what the rear browser itself exposes: Chromium version/build hints, platform identity, Cloudflare-observed network/TLS metadata, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, WebAudio, V8/WASM, codecs/media, sensors/hardware surfaces, service worker/cache availability, frame policy behavior, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
+The current pass focuses on what the rear browser itself exposes: Chromium version/build hints and threshold comparisons, platform identity, Cloudflare-observed network/TLS metadata, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, WebAudio, V8/WASM, codecs/media, sensors/hardware surfaces, service worker/cache availability, frame policy behavior, chain viability evidence, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
 
 Live deployment:
 
@@ -10,9 +10,9 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.4.0`
+Current probe version: `1.5.0`
 
-Build date: `2026-05-04T17:36:35Z`
+Build date: `2026-05-05T11:36:34Z`
 
 ## Safety Model
 
@@ -111,10 +111,11 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 
 1. Open the live URL in the rear browser.
 2. Press `Run browser probe`.
-3. If useful, manually tap selected `chrome://` surface links and record what happens.
-4. Add notes for dialogs, blocked actions, crashes, or VM/browser transitions.
-5. Open the same URL on your Mac.
-6. Use the Shared Log tab to view, copy, download, or clear the server log.
+3. Review the `Chain viability assessment` row in the shared log.
+4. If useful, manually tap selected `chrome://` surface links and record what happens.
+5. Paste manual `chrome://version`, `chrome://sandbox`, `chrome://gpu`, UID, SELinux, permission, or IPC evidence into the Chain Viability Test box and press Save chain evidence.
+6. Open the same URL on your Mac.
+7. Use the Shared Log tab to view, copy, download, or clear the server log.
 
 ## Interpreting Results
 
@@ -125,6 +126,7 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 - WebGL, WebGPU, WebAudio, WebAssembly, and WebRTC results help map which Chromium subsystems are exposed and therefore should be checked against the vendor's exact patch level.
 - Visuals/compositor, canvas/image, codecs/media, sensors, network policy, and iframe-policy smoke tests broaden subsystem coverage without exploit payloads.
 - The patch candidate matrix is not a vulnerability verdict. It marks areas where exact Chromium build and vendor backport status are required.
+- The chain viability assessment compares the best visible Chromium version against `124.0.6367.60`, `124.0.6367.201`, and `124.0.6367.207`, then explicitly marks which later questions require manual evidence.
 - `/api/client-info` records what Cloudflare observes from the browser request, including network/TLS/client-hint metadata where available.
 - `chrome://` links opening successfully may reveal useful version, sandbox, GPU, policy, download, or crash pages.
 - Nothing happens on an internal link usually means the browser filters it or the embedded Chromium shell blocks that surface.
@@ -132,6 +134,16 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 ## Patch Candidate Context
 
 The probe highlights exposed subsystems related to known Chromium 124-era security update areas, including ANGLE/WebGL, Dawn/WebGPU, Visuals/rendering, V8/WebAssembly, WebAudio, codecs/media, and WebRTC. These checks are for patch triage only. A positive exposure means "verify exact build and patches", not "confirmed vulnerable".
+
+## Chain Viability Context
+
+The chain test is designed to answer:
+
+```text
+renderer compromise -> sandbox/process boundary -> privileged IPC/vendor surface -> shell/ADB/debug feasibility
+```
+
+Browser JavaScript can only answer the version and web-exposed-surface portions. Questions about OEM backports, Chromium sandboxing, Viz/GPU/browser process isolation, Android UID, SELinux domain, privileged vendor permissions, and privileged IPC surfaces require manual evidence from `chrome://version`, `chrome://sandbox`, `chrome://gpu`, shell/ADB, or an authorised recon APK.
 
 Reference starting points:
 
