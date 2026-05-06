@@ -1,9 +1,10 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v5";
-  var APP_VERSION = "1.5.0";
-  var BUILD_DATE = "2026-05-05T11:36:34Z";
+  var STORAGE_KEY = "zbip.report.v6";
+  var APP_VERSION = "1.6.0";
+  var BUILD_DATE = "2026-05-06T11:15:17Z";
+  var DEFAULT_TEST_TIMEOUT_MS = 10000;
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
   var serverLogs = [];
@@ -68,6 +69,10 @@
       if (action === "refresh-env") return handleAction("session", "Refresh environment", "", "tap", refreshEnvironment);
       if (action === "copy-env") return handleAction("session", "Copy environment", "", "tap", function () { return copyText(JSON.stringify(state.environment, null, 2)); });
       if (action === "save-chain-evidence") return saveChainEvidence();
+      if (action === "manual-clipboard-read") return handleAction("manual_prompt", "Clipboard read prompt", "", "tap", manualClipboardRead);
+      if (action === "manual-persistent-storage") return handleAction("manual_prompt", "Persistent storage prompt", "", "tap", manualPersistentStorage);
+      if (action === "manual-bluetooth-prompt") return handleAction("manual_prompt", "Web Bluetooth prompt", "", "tap", manualBluetoothPrompt);
+      if (action === "manual-usb-prompt") return handleAction("manual_prompt", "WebUSB prompt", "", "tap", manualUsbPrompt);
       if (action === "save-notes") return saveNotes();
       if (action === "copy-visible-log") return handleAction("report", "Copy visible log", "", "tap", function () { return copyText(JSON.stringify(getFilteredLogs(), null, 2)); });
       if (action === "download-log") return handleAction("report", "Download server log JSON", "", "tap", function () { downloadJson("zeekr-browser-intent-probe-server-log.json", serverLogs); });
@@ -90,10 +95,13 @@
       ["Chromium version hints", collectVersionHints],
       ["High entropy client hints", collectHighEntropyClientHints],
       ["Server observed client info", collectServerClientInfo],
+      ["Request header echo", collectRequestHeaderEcho],
+      ["Chrome legacy timing APIs", collectChromeLegacyTiming],
       ["Chain viability assessment", collectChainViabilityAssessment],
       ["Security context and isolation", collectSecurityContext],
       ["Storage and cookie capability", testStorageCapabilities],
       ["Cache persistence check", testCachePersistence],
+      ["Service worker registration persistence", collectServiceWorkerRegistrationPersistence],
       ["Download capability", testDownloadCapabilities],
       ["Permissions API snapshot", collectPermissions],
       ["High-risk web APIs", collectHighRiskApis],
@@ -101,6 +109,7 @@
       ["Visuals compositor smoke", collectVisualsCompositorSmoke],
       ["Canvas and image surface", collectCanvasAndImageSurface],
       ["WebGL fingerprint", collectWebGl],
+      ["WebGL limits and precision", collectWebGlLimitsAndPrecision],
       ["WebGPU adapter snapshot", collectWebGpu],
       ["V8 and WebAssembly smoke", collectV8AndWasmSmoke],
       ["WebAudio smoke", collectWebAudioSmoke],
@@ -118,7 +127,7 @@
       var name = tests[i][0];
       try {
         setProbeStatus("Running: " + name);
-        var result = await tests[i][1]();
+        var result = await withTimeout(tests[i][1](), DEFAULT_TEST_TIMEOUT_MS, name);
         logStructured("browser_probe", name, "", "run", "captured", result);
       } catch (err) {
         logStructured("browser_probe", name, "", "run", "error", { message: err.message || String(err) });
@@ -182,6 +191,49 @@
     } catch (err) {
       return { ok: false, error: err.message || String(err) };
     }
+  }
+
+  async function collectRequestHeaderEcho() {
+    try {
+      var response = await fetch("/api/request-echo?ts=" + Date.now(), { cache: "no-store" });
+      var body = await response.json();
+      body.note = "Server-side echo of request headers visible to Cloudflare Worker. Useful when chrome:// pages are blocked.";
+      return body;
+    } catch (err) {
+      return { ok: false, error: err.message || String(err) };
+    }
+  }
+
+  function collectChromeLegacyTiming() {
+    var out = {
+      chrome_object: typeof window.chrome,
+      chrome_keys: window.chrome ? Object.keys(window.chrome).slice(0, 50) : []
+    };
+    try {
+      out.csi = window.chrome && typeof window.chrome.csi === "function" ? window.chrome.csi() : null;
+    } catch (err) {
+      out.csi_error = err.message || String(err);
+    }
+    try {
+      out.load_times = window.chrome && typeof window.chrome.loadTimes === "function" ? window.chrome.loadTimes() : null;
+    } catch (err2) {
+      out.load_times_error = err2.message || String(err2);
+    }
+    try {
+      var nav = performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
+      out.navigation_timing = nav ? {
+        type: nav.type,
+        nextHopProtocol: nav.nextHopProtocol,
+        transferSize: nav.transferSize,
+        encodedBodySize: nav.encodedBodySize,
+        decodedBodySize: nav.decodedBodySize,
+        domInteractive: Math.round(nav.domInteractive),
+        domComplete: Math.round(nav.domComplete)
+      } : null;
+    } catch (err3) {
+      out.navigation_timing_error = err3.message || String(err3);
+    }
+    return Promise.resolve(out);
   }
 
   async function collectChainViabilityAssessment() {
@@ -315,6 +367,31 @@
       out.value = match ? await match.text() : "";
       await cache.delete(key);
       out.deleted_entry = true;
+    } catch (err) {
+      out.error = err.message || String(err);
+    }
+    return out;
+  }
+
+  async function collectServiceWorkerRegistrationPersistence() {
+    var out = {
+      supported: "serviceWorker" in navigator,
+      controller_present: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller)
+    };
+    if (!out.supported) return out;
+    try {
+      var before = await navigator.serviceWorker.getRegistrations();
+      out.registrations_before = before.length;
+      var registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      out.registered = Boolean(registration);
+      out.scope = registration.scope;
+      await navigator.serviceWorker.ready;
+      var after = await navigator.serviceWorker.getRegistrations();
+      out.registrations_after = after.length;
+      out.active_state = registration.active ? registration.active.state : "";
+      out.installing_state = registration.installing ? registration.installing.state : "";
+      out.waiting_state = registration.waiting ? registration.waiting.state : "";
+      out.note = "Registration is intentionally left in place so a later run can check persistence after reload/restart.";
     } catch (err) {
       out.error = err.message || String(err);
     }
@@ -556,6 +633,44 @@
       unmasked_renderer: debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : null,
       extensions: gl.getSupportedExtensions() || []
     });
+  }
+
+  function collectWebGlLimitsAndPrecision() {
+    var canvas = document.createElement("canvas");
+    var gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) return Promise.resolve({ supported: false });
+    var params = [
+      "MAX_TEXTURE_SIZE",
+      "MAX_CUBE_MAP_TEXTURE_SIZE",
+      "MAX_RENDERBUFFER_SIZE",
+      "MAX_VERTEX_ATTRIBS",
+      "MAX_VERTEX_UNIFORM_VECTORS",
+      "MAX_VARYING_VECTORS",
+      "MAX_FRAGMENT_UNIFORM_VECTORS",
+      "MAX_TEXTURE_IMAGE_UNITS",
+      "MAX_VERTEX_TEXTURE_IMAGE_UNITS",
+      "MAX_COMBINED_TEXTURE_IMAGE_UNITS",
+      "ALIASED_LINE_WIDTH_RANGE",
+      "ALIASED_POINT_SIZE_RANGE"
+    ];
+    var out = { supported: true, parameters: {}, precision: {}, extensions_count: 0 };
+    params.forEach(function (name) {
+      try { out.parameters[name] = gl.getParameter(gl[name]); } catch (err) { out.parameters[name] = "error: " + (err.message || String(err)); }
+    });
+    try {
+      ["LOW_FLOAT", "MEDIUM_FLOAT", "HIGH_FLOAT"].forEach(function (name) {
+        var p = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl[name]);
+        out.precision["FRAGMENT_" + name] = p ? { rangeMin: p.rangeMin, rangeMax: p.rangeMax, precision: p.precision } : null;
+      });
+      ["LOW_INT", "MEDIUM_INT", "HIGH_INT"].forEach(function (name) {
+        var p = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl[name]);
+        out.precision["FRAGMENT_" + name] = p ? { rangeMin: p.rangeMin, rangeMax: p.rangeMax, precision: p.precision } : null;
+      });
+    } catch (err2) {
+      out.precision_error = err2.message || String(err2);
+    }
+    try { out.extensions_count = (gl.getSupportedExtensions() || []).length; } catch (err3) {}
+    return Promise.resolve(out);
   }
 
   async function collectWebGpu() {
@@ -918,6 +1033,24 @@
     }
   }
 
+  function withTimeout(promise, timeoutMs, label) {
+    var timer;
+    return Promise.race([
+      Promise.resolve(promise),
+      new Promise(function (_, reject) {
+        timer = setTimeout(function () {
+          reject(new Error((label || "operation") + " timed out after " + timeoutMs + "ms"));
+        }, timeoutMs);
+      })
+    ]).then(function (value) {
+      clearTimeout(timer);
+      return value;
+    }, function (err) {
+      clearTimeout(timer);
+      throw err;
+    });
+  }
+
   async function testInternalSchemes() {
     var schemes = ["chrome://version", "chrome://gpu", "chrome://sandbox", "chrome://policy", "file:///", "about:blank"];
     var out = {};
@@ -1144,6 +1277,44 @@
     state.chain_evidence = field ? field.value : "";
     saveState();
     logEvent("chain", "Save manual chain evidence", "", "tap", "saved", state.chain_evidence);
+  }
+
+  async function manualClipboardRead() {
+    if (!navigator.clipboard || !navigator.clipboard.readText) return "clipboard read unsupported";
+    var text = await withTimeout(navigator.clipboard.readText(), DEFAULT_TEST_TIMEOUT_MS, "clipboard read");
+    return JSON.stringify({ read_length: text.length, preview: text.slice(0, 80) });
+  }
+
+  async function manualPersistentStorage() {
+    if (!navigator.storage || !navigator.storage.persist) return "persistent storage unsupported";
+    var granted = await withTimeout(navigator.storage.persist(), DEFAULT_TEST_TIMEOUT_MS, "persistent storage");
+    return JSON.stringify({ granted: granted });
+  }
+
+  async function manualBluetoothPrompt() {
+    if (!navigator.bluetooth || !navigator.bluetooth.requestDevice) return "Web Bluetooth requestDevice unsupported";
+    var device = await withTimeout(navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: ["battery_service", "device_information"]
+    }), DEFAULT_TEST_TIMEOUT_MS, "Web Bluetooth prompt");
+    return JSON.stringify({
+      selected: Boolean(device),
+      name_present: Boolean(device && device.name),
+      id_present: Boolean(device && device.id),
+      gatt_present: Boolean(device && device.gatt)
+    });
+  }
+
+  async function manualUsbPrompt() {
+    if (!navigator.usb || !navigator.usb.requestDevice) return "WebUSB requestDevice unsupported";
+    var device = await withTimeout(navigator.usb.requestDevice({ filters: [{}] }), DEFAULT_TEST_TIMEOUT_MS, "WebUSB prompt");
+    return JSON.stringify({
+      selected: Boolean(device),
+      vendor_id: device ? device.vendorId : null,
+      product_id: device ? device.productId : null,
+      product_name_present: Boolean(device && device.productName),
+      manufacturer_name_present: Boolean(device && device.manufacturerName)
+    });
   }
 
   function clearLog() {

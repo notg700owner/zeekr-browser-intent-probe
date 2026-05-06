@@ -10,15 +10,17 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.5.0`
+Current probe version: `1.6.0`
 
-Build date: `2026-05-05T11:36:34Z`
+Build date: `2026-05-06T11:15:17Z`
 
 ## Safety Model
 
 - This page does not exploit the browser.
 - This page does not automatically open apps or settings.
 - The one-button probe runs non-destructive max-coverage browser capability and patch-candidate exposure checks.
+- Each automatic test has a timeout so a hanging browser API cannot stop later checks from running.
+- Permission-prompting checks are separated into manual buttons.
 - The vulnerability-oriented checks map exposed subsystems; they do not include exploit payloads or crash tests.
 - Manual `chrome://` links require a visible tap and do not change settings.
 - Logs are saved to the authorised Cloudflare Worker/KV backend so the car browser and Mac browser can see the same stream.
@@ -100,6 +102,7 @@ Useful endpoints:
 ```text
 /api/status
 /api/client-info
+/api/request-echo
 /api/log
 /api/logs
 /api/clear
@@ -125,6 +128,7 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 - Permission results show what the browser exposes through the Permissions API; they do not request dangerous access.
 - WebGL, WebGPU, WebAudio, WebAssembly, and WebRTC results help map which Chromium subsystems are exposed and therefore should be checked against the vendor's exact patch level.
 - Visuals/compositor, canvas/image, codecs/media, sensors, network policy, and iframe-policy smoke tests broaden subsystem coverage without exploit payloads.
+- Request-header echo, legacy Chrome timing APIs, WebGL limits/precision, and service worker registration add browser-only fallback data when `chrome://` pages are blocked.
 - The patch candidate matrix is not a vulnerability verdict. It marks areas where exact Chromium build and vendor backport status are required.
 - The chain viability assessment compares the best visible Chromium version against `124.0.6367.60`, `124.0.6367.201`, and `124.0.6367.207`, then explicitly marks which later questions require manual evidence.
 - `/api/client-info` records what Cloudflare observes from the browser request, including network/TLS/client-hint metadata where available.

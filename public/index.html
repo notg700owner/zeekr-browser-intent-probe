@@ -12,7 +12,7 @@
     <div>
       <p class="eyebrow">Authorised defensive assessment</p>
       <h1>Zeekr Browser Intent Probe</h1>
-      <p class="build-meta">Version <strong id="appVersion">1.5.0</strong> · Build <strong id="buildDate">2026-05-05T11:36:34Z</strong></p>
+      <p class="build-meta">Version <strong id="appVersion">1.6.0</strong> · Build <strong id="buildDate">2026-05-06T11:15:17Z</strong></p>
     </div>
     <div class="status-pill" id="storageStatus">Storage: checking</div>
   </header>
@@ -39,8 +39,24 @@
             <button type="button" class="primary" data-action="run-full-probe">Run browser probe</button>
           </div>
         </div>
-        <p class="hint">Runs non-destructive max-coverage checks for Chromium version/build thresholds, Cloudflare-observed client info, sandbox/process evidence gaps, storage persistence, permissions, Web APIs, graphics/compositor surfaces, WebAudio, WASM/V8, codecs, sensors, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
+        <p class="hint">Runs non-destructive max-coverage checks with per-test timeouts for Chromium version/build thresholds, Cloudflare-observed request data, sandbox/process evidence gaps, storage persistence, permissions, Web APIs, graphics/compositor surfaces, WebAudio, WASM/V8, codecs, sensors, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
         <div class="result" id="probeStatus">Ready.</div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Manual Prompt Probes</p>
+            <h2>Tap Only For Dialog Tests</h2>
+          </div>
+        </div>
+        <p class="warning">These buttons may show browser or system permission prompts. They are separated from the main probe so the automatic run cannot get stuck waiting for a dialog.</p>
+        <div class="button-row">
+          <button type="button" data-action="manual-clipboard-read">Clipboard read</button>
+          <button type="button" data-action="manual-persistent-storage">Persistent storage</button>
+          <button type="button" data-action="manual-bluetooth-prompt">Bluetooth prompt</button>
+          <button type="button" data-action="manual-usb-prompt">USB prompt</button>
+        </div>
       </section>
 
       <section class="panel">
@@ -78,7 +94,7 @@
           <li>WebAudio, WebRTC, permissions, and device API surfaces</li>
           <li>Sensors, hardware, File System Access, WebAuthn, WebCodecs, and network policy surfaces</li>
           <li>Service worker, Cache API, iframe sandbox, and policy behavior</li>
-          <li>Cloudflare-observed network/TLS/client-hint metadata</li>
+          <li>Cloudflare-observed request headers, network/TLS/client-hint metadata, and legacy Chrome timing APIs</li>
         </ul>
       </section>
 

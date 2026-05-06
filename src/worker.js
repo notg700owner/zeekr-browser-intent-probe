@@ -22,6 +22,10 @@ export default {
       return clientInfo(request);
     }
 
+    if (url.pathname === "/api/request-echo") {
+      return requestEcho(request);
+    }
+
     if (url.pathname === "/api/log" && request.method === "POST") {
       return appendLog(request, env);
     }
@@ -64,6 +68,38 @@ function clientInfo(request) {
     sec_ch_ua: headers.get("sec-ch-ua") || "",
     sec_ch_ua_platform: headers.get("sec-ch-ua-platform") || "",
     sec_ch_ua_mobile: headers.get("sec-ch-ua-mobile") || ""
+  });
+}
+
+function requestEcho(request) {
+  const headers = {};
+  for (const [key, value] of request.headers.entries()) {
+    const lower = key.toLowerCase();
+    if (
+      lower === "user-agent" ||
+      lower === "accept" ||
+      lower === "accept-language" ||
+      lower === "accept-encoding" ||
+      lower === "cache-control" ||
+      lower === "priority" ||
+      lower === "referer" ||
+      lower === "sec-fetch-dest" ||
+      lower === "sec-fetch-mode" ||
+      lower === "sec-fetch-site" ||
+      lower === "sec-fetch-user" ||
+      lower.startsWith("sec-ch-") ||
+      lower.startsWith("cf-")
+    ) {
+      headers[lower] = value;
+    }
+  }
+  return json({
+    ok: true,
+    observed_at: new Date().toISOString(),
+    method: request.method,
+    url: request.url,
+    cf: request.cf || {},
+    headers
   });
 }
 
@@ -192,6 +228,24 @@ function withProbeHeaders(response) {
     "Sec-CH-UA-Bitness",
     "Sec-CH-UA-Model",
     "Sec-CH-UA-Mobile"
+  ].join(", "));
+  headers.set("Critical-CH", [
+    "Sec-CH-UA-Full-Version",
+    "Sec-CH-UA-Full-Version-List",
+    "Sec-CH-UA-Platform-Version",
+    "Sec-CH-UA-Arch",
+    "Sec-CH-UA-Bitness"
+  ].join(", "));
+  headers.set("Permissions-Policy", [
+    "ch-ua=(self)",
+    "ch-ua-full-version=(self)",
+    "ch-ua-full-version-list=(self)",
+    "ch-ua-platform=(self)",
+    "ch-ua-platform-version=(self)",
+    "ch-ua-arch=(self)",
+    "ch-ua-bitness=(self)",
+    "ch-ua-model=(self)",
+    "ch-ua-mobile=(self)"
   ].join(", "));
   headers.set("Cache-Control", headers.get("Cache-Control") || "no-store");
   return new Response(response.body, {
