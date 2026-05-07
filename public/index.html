@@ -12,7 +12,7 @@
     <div>
       <p class="eyebrow">Authorised defensive assessment</p>
       <h1>Zeekr Browser Intent Probe</h1>
-      <p class="build-meta">Version <strong id="appVersion">1.7.0</strong> · Build <strong id="buildDate">2026-05-07T07:54:46Z</strong></p>
+      <p class="build-meta">Version <strong id="appVersion">1.8.0</strong> · Build <strong id="buildDate">2026-05-07T08:02:52Z</strong></p>
     </div>
     <div class="status-pill" id="storageStatus">Storage: checking</div>
   </header>
@@ -39,7 +39,7 @@
             <button type="button" class="primary" data-action="run-full-probe">Run browser probe</button>
           </div>
         </div>
-        <p class="hint">Runs non-destructive max-coverage checks with per-test timeouts for Chromium version/build thresholds, post-renderer boundary risk, Cloudflare-observed request data, sandbox/process evidence gaps, storage persistence, permissions, Web APIs, graphics/compositor surfaces, WebAudio, WASM/V8, codecs, sensors, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
+        <p class="hint">Runs non-destructive max-coverage checks with per-test timeouts for Chromium version/build thresholds, post-renderer boundary risk, Cloudflare-observed request data, fixed-list internal reachability, sandbox/process evidence gaps, storage persistence, permissions, Web APIs, graphics/compositor surfaces, WebAudio, WASM/V8, codecs, sensors, WebRTC, frame policy, and vulnerability patch-candidate exposure. Results stream to the shared server log.</p>
         <div class="result" id="probeStatus">Ready.</div>
       </section>
 
@@ -75,6 +75,7 @@
           <li>Manual: chrome://version, chrome://sandbox, chrome://gpu, command line flags, process list, UID, SELinux context, package permissions, and exposed IPC surfaces.</li>
           <li>Goal: decide whether a renderer compromise would plausibly reach privileged browser, GPU/Viz, vendor IPC, shell, or ADB/debug surfaces.</li>
           <li>New: a post-renderer boundary triage row separates positive risk indicators from mitigations, blockers, and required non-web evidence.</li>
+          <li>New: one-button fixed-list internal reachability checks for localhost, loopback, and observed WebRTC subnet candidates.</li>
         </ul>
         <textarea id="chainEvidence" rows="8" placeholder="Paste or type manual evidence here: chrome://version output, chrome://sandbox status, chrome://gpu notes, ps/procfs output, UID, SELinux domain, package permissions, IPC observations"></textarea>
       </section>

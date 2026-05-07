@@ -2,7 +2,7 @@
 
 A defensive, single-page browser probe for an authorised Zeekr 9X rear-screen Chromium / VM assessment.
 
-The current pass focuses on what the rear browser itself exposes: Chromium version/build hints and threshold comparisons, platform identity, Cloudflare-observed network/TLS metadata, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, WebAudio, V8/WASM, codecs/media, sensors/hardware surfaces, service worker/cache availability, frame policy behavior, chain viability evidence, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
+The current pass focuses on what the rear browser itself exposes: Chromium version/build hints and threshold comparisons, platform identity, Cloudflare-observed network/TLS metadata, fixed-list internal reachability, storage persistence, download support, permissions, Web APIs, WebGL, WebGPU, WebRTC, WebAudio, V8/WASM, codecs/media, sensors/hardware surfaces, service worker/cache availability, frame policy behavior, chain viability evidence, and manual `chrome://` surface checks. Earlier APK, custom-scheme, and Android Settings probes were removed from the UI because the tested environment did not handle them usefully.
 
 Live deployment:
 
@@ -10,9 +10,9 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.7.0`
+Current probe version: `1.8.0`
 
-Build date: `2026-05-07T07:54:46Z`
+Build date: `2026-05-07T08:02:52Z`
 
 ## Safety Model
 
@@ -132,6 +132,7 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 - The patch candidate matrix is not a vulnerability verdict. It marks areas where exact Chromium build and vendor backport status are required.
 - The chain viability assessment compares the best visible Chromium version against `124.0.6367.60`, `124.0.6367.201`, and `124.0.6367.207`, then explicitly marks which later questions require manual evidence.
 - The post-renderer boundary risk triage row separates positive sandbox-escape risk indicators from mitigations, confirmation blockers, and required non-web evidence.
+- The single-button internal reachability row checks a small fixed list of localhost, loopback, and observed WebRTC-subnet URLs with short browser-side timeouts. It is not a scanner.
 - `/api/client-info` records what Cloudflare observes from the browser request, including network/TLS/client-hint metadata where available.
 - `chrome://` links opening successfully may reveal useful version, sandbox, GPU, policy, download, or crash pages.
 - Nothing happens on an internal link usually means the browser filters it or the embedded Chromium shell blocks that surface.

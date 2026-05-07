@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v7";
-  var APP_VERSION = "1.7.0";
-  var BUILD_DATE = "2026-05-07T07:54:46Z";
+  var STORAGE_KEY = "zbip.report.v8";
+  var APP_VERSION = "1.8.0";
+  var BUILD_DATE = "2026-05-07T08:02:52Z";
   var DEFAULT_TEST_TIMEOUT_MS = 10000;
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
@@ -117,6 +117,7 @@
       ["Codecs and media surface", collectCodecsAndMediaSurface],
       ["Sensors and hardware surface", collectSensorsAndHardwareSurface],
       ["Network and fetch policy surface", collectNetworkAndFetchPolicySurface],
+      ["Single-button internal reachability", collectInternalReachability],
       ["WebRTC support", collectWebRtc],
       ["Service worker and cache", collectWorkerAndCache],
       ["Frame and policy surface", collectFrameAndPolicySurface],
@@ -906,6 +907,113 @@
       out.same_origin_fetch_error = err.message || String(err);
     }
     return out;
+  }
+
+  async function collectInternalReachability() {
+    var targets = buildInternalReachabilityTargets();
+    var results = [];
+    for (var i = 0; i < targets.length; i++) {
+      results.push(await probeInternalTarget(targets[i]));
+    }
+    return {
+      note: "One-button, fixed-list browser reachability checks only. Results can be affected by CORS, mixed-content blocking, Private Network Access, service workers, and local firewall policy. This is not a port scanner.",
+      target_count: targets.length,
+      targets: results
+    };
+  }
+
+  function buildInternalReachabilityTargets() {
+    var hosts = [
+      "127.0.0.1",
+      "localhost",
+      "10.201.0.1",
+      "10.201.0.7"
+    ];
+    var paths = [
+      { label: "root_http", scheme: "http", port: "", path: "/" },
+      { label: "root_8080", scheme: "http", port: "8080", path: "/" },
+      { label: "devtools_9222_version", scheme: "http", port: "9222", path: "/json/version" },
+      { label: "devtools_9223_version", scheme: "http", port: "9223", path: "/json/version" },
+      { label: "node_debug_9229", scheme: "http", port: "9229", path: "/json/version" },
+      { label: "webdriver_9515", scheme: "http", port: "9515", path: "/status" }
+    ];
+    var out = [];
+    hosts.forEach(function (host) {
+      paths.forEach(function (item) {
+        out.push({
+          label: host + "_" + item.label,
+          host: host,
+          url: item.scheme + "://" + host + (item.port ? ":" + item.port : "") + item.path
+        });
+      });
+    });
+    return out;
+  }
+
+  async function probeInternalTarget(target) {
+    var result = {
+      label: target.label,
+      url: target.url,
+      fetch_no_cors: null,
+      image_load: null
+    };
+    result.fetch_no_cors = await probeFetchNoCors(target.url);
+    result.image_load = await probeImageLoad(target.url);
+    return result;
+  }
+
+  async function probeFetchNoCors(url) {
+    var started = performance.now();
+    try {
+      var response = await withTimeout(fetch(url, {
+        mode: "no-cors",
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "manual"
+      }), 2500, "fetch " + url);
+      return {
+        outcome: "resolved",
+        type: response.type,
+        ok: response.ok,
+        status: response.status,
+        elapsed_ms: Math.round(performance.now() - started)
+      };
+    } catch (err) {
+      return {
+        outcome: "error",
+        error: err.name || "Error",
+        message: err.message || String(err),
+        elapsed_ms: Math.round(performance.now() - started)
+      };
+    }
+  }
+
+  function probeImageLoad(url) {
+    var started = performance.now();
+    return new Promise(function (resolve) {
+      var img = new Image();
+      var done = false;
+      var timer = setTimeout(function () {
+        finish("timeout", "");
+      }, 2500);
+      function finish(outcome, message) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        img.onload = null;
+        img.onerror = null;
+        img.src = "";
+        resolve({
+          outcome: outcome,
+          message: message || "",
+          elapsed_ms: Math.round(performance.now() - started)
+        });
+      }
+      img.onload = function () { finish("loaded", "image load event fired"); };
+      img.onerror = function () { finish("error", "image error event fired"); };
+      img.referrerPolicy = "no-referrer";
+      img.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "zbip_img=" + Date.now();
+    });
   }
 
   function collectWebRtc() {

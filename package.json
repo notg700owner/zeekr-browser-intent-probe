@@ -1,6 +1,6 @@
 {
   "name": "zeekr-browser-intent-probe",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "private": true,
   "description": "Defensive Chromium capability probe for authorised Zeekr rear-screen browser assessments.",
   "scripts": {
