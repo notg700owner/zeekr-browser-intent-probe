@@ -10,9 +10,9 @@ Live deployment:
 https://zeekr-browser-intent-probe.g700owner.workers.dev
 ```
 
-Current probe version: `1.6.0`
+Current probe version: `1.7.0`
 
-Build date: `2026-05-06T11:15:17Z`
+Build date: `2026-05-07T07:54:46Z`
 
 ## Safety Model
 
@@ -131,6 +131,7 @@ The Cloudflare KV namespace binding is configured in `wrangler.toml` as `LOGS_KV
 - Request-header echo, legacy Chrome timing APIs, WebGL limits/precision, and service worker registration add browser-only fallback data when `chrome://` pages are blocked.
 - The patch candidate matrix is not a vulnerability verdict. It marks areas where exact Chromium build and vendor backport status are required.
 - The chain viability assessment compares the best visible Chromium version against `124.0.6367.60`, `124.0.6367.201`, and `124.0.6367.207`, then explicitly marks which later questions require manual evidence.
+- The post-renderer boundary risk triage row separates positive sandbox-escape risk indicators from mitigations, confirmation blockers, and required non-web evidence.
 - `/api/client-info` records what Cloudflare observes from the browser request, including network/TLS/client-hint metadata where available.
 - `chrome://` links opening successfully may reveal useful version, sandbox, GPU, policy, download, or crash pages.
 - Nothing happens on an internal link usually means the browser filters it or the embedded Chromium shell blocks that surface.
@@ -148,6 +149,8 @@ renderer compromise -> sandbox/process boundary -> privileged IPC/vendor surface
 ```
 
 Browser JavaScript can only answer the version and web-exposed-surface portions. Questions about OEM backports, Chromium sandboxing, Viz/GPU/browser process isolation, Android UID, SELinux domain, privileged vendor permissions, and privileged IPC surfaces require manual evidence from `chrome://version`, `chrome://sandbox`, `chrome://gpu`, shell/ADB, or an authorised recon APK.
+
+The post-renderer boundary triage is not an exploit test. It estimates whether sandbox escape risk is worth deeper authorised investigation by combining exact visible Chromium version, known fixed-version thresholds, exposed renderer/GPU/V8/WebRTC/device surfaces, and browser-side mitigations such as SharedArrayBuffer and cross-origin isolation state.
 
 Reference starting points:
 

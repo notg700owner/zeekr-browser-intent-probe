@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v6";
-  var APP_VERSION = "1.6.0";
-  var BUILD_DATE = "2026-05-06T11:15:17Z";
+  var STORAGE_KEY = "zbip.report.v7";
+  var APP_VERSION = "1.7.0";
+  var BUILD_DATE = "2026-05-07T07:54:46Z";
   var DEFAULT_TEST_TIMEOUT_MS = 10000;
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
@@ -98,6 +98,7 @@
       ["Request header echo", collectRequestHeaderEcho],
       ["Chrome legacy timing APIs", collectChromeLegacyTiming],
       ["Chain viability assessment", collectChainViabilityAssessment],
+      ["Post-renderer boundary risk triage", collectPostRendererBoundaryRiskTriage],
       ["Security context and isolation", collectSecurityContext],
       ["Storage and cookie capability", testStorageCapabilities],
       ["Cache persistence check", testCachePersistence],
@@ -278,6 +279,76 @@
         chainQuestion(10, "Determine whether renderer compromise exposes privileged IPC surfaces", "requires_architecture_review", "Requires process model, exposed Mojo/IPC services, SELinux policy, binder/socket access, and sandbox boundary review.")
       ],
       manual_evidence_currently_saved: state.chain_evidence || "",
+      no_exploit_payloads_run: true
+    };
+  }
+
+  async function collectPostRendererBoundaryRiskTriage() {
+    var versionInfo = await collectBestVersionInfo();
+    var before4671Fix = compareVersions(versionInfo.best_version, "124.0.6367.201");
+    var before207 = compareVersions(versionInfo.best_version, "124.0.6367.207");
+    var webgl = Boolean(document.createElement("canvas").getContext("webgl") || document.createElement("canvas").getContext("webgl2"));
+    var gpuAdapter = { attempted: false, available: null, error: "" };
+
+    if (navigator.gpu && navigator.gpu.requestAdapter) {
+      gpuAdapter.attempted = true;
+      try {
+        var adapter = await withTimeout(navigator.gpu.requestAdapter(), 2500, "WebGPU adapter boundary triage");
+        gpuAdapter.available = Boolean(adapter);
+      } catch (err) {
+        gpuAdapter.error = err.message || String(err);
+      }
+    }
+
+    var positive = [];
+    var mitigating = [];
+    var blockers = [];
+    var unknown = [];
+
+    if (before4671Fix != null && before4671Fix < 0) positive.push("Visible Chromium build is before 124.0.6367.201, the public Chrome 124 line that fixed CVE-2024-4671.");
+    if (before207 != null && before207 < 0) positive.push("Visible Chromium build is before 124.0.6367.207.");
+    if (webgl) positive.push("WebGL/WebGL2 is reachable; ANGLE/GPU process attack surface is exposed.");
+    if ("gpu" in navigator) positive.push("navigator.gpu is exposed; Dawn/WebGPU API surface exists.");
+    if ("RTCPeerConnection" in window) positive.push("WebRTC is reachable and prior runs exposed a private host candidate.");
+    if (typeof WebAssembly !== "undefined") positive.push("V8/WebAssembly paths are reachable.");
+    if ("serviceWorker" in navigator) positive.push("Service worker registration is supported, enabling origin persistence for repeated authorised testing.");
+    if ("usb" in navigator || "bluetooth" in navigator || "NDEFReader" in window) positive.push("Device-oriented APIs are exposed to web content.");
+
+    if (typeof SharedArrayBuffer === "undefined") mitigating.push("SharedArrayBuffer is not exposed, reducing some high-precision exploitation primitives.");
+    if (!window.crossOriginIsolated) mitigating.push("Page is not cross-origin isolated; stronger shared-memory primitives are unavailable in this origin.");
+    if (gpuAdapter.attempted && gpuAdapter.available === false) mitigating.push("WebGPU requestAdapter returned no adapter in this context, reducing practical Dawn exposure despite navigator.gpu.");
+    if (!("showOpenFilePicker" in window) && !("showSaveFilePicker" in window)) mitigating.push("File System Access picker APIs are not exposed.");
+    if (!("serial" in navigator)) mitigating.push("WebSerial is not exposed.");
+
+    blockers.push("A webpage cannot directly verify Chromium OS sandbox, setuid/user namespace sandbox, seccomp, PID namespaces, SELinux, Android UID, Binder access, or Mojo service exposure.");
+    blockers.push("chrome:// pages are blocked or unproductive in current testing, so process and command-line evidence is still unavailable.");
+    blockers.push("No exploit payloads or crash/fuzz tests were run; this is precondition and exposure triage only.");
+
+    unknown.push("Whether OEM backported CVE-2024-4671 or related fixes without changing visible Chromium version.");
+    unknown.push("Whether renderer, Viz, GPU, utility, and browser processes are isolated with normal Chromium sandbox policy.");
+    unknown.push("Whether a compromised renderer would have access to privileged vendor IPC, Binder, sockets, files, or debug services.");
+    unknown.push("Whether the browser runs in Android userspace, a Linux VM/container, or another OEM shell despite Android-like hardware context.");
+
+    return {
+      objective: "Estimate whether post-renderer sandbox escape risk is plausible from web-visible evidence. This does not exploit or escape the sandbox.",
+      visible_version: versionInfo.best_version,
+      version_sources: versionInfo.sources,
+      threshold_status: {
+        before_124_0_6367_201: before4671Fix == null ? "unknown" : before4671Fix < 0,
+        before_124_0_6367_207: before207 == null ? "unknown" : before207 < 0
+      },
+      boundary_risk_rating: positive.length >= 5 && before4671Fix < 0 ? "elevated_patch_candidate" : "needs_manual_boundary_evidence",
+      positive_indicators: positive,
+      mitigating_indicators: mitigating,
+      hard_blockers_to_confirming_escape: blockers,
+      required_next_evidence: unknown,
+      recommended_non_exploit_evidence_sources: [
+        "OEM build notes or SBOM showing Chromium branch and cherry-picked security fixes",
+        "Authorised recon APK or shell output: ps -AZ, id, getenforce, dumpsys package, appops, /proc/<pid>/status",
+        "Crash/debug logs showing Chromium process model and command line",
+        "Firmware image or browser binary strings for Chromium commit/build metadata",
+        "Mojo/Binder/socket inventory from authorised local tooling"
+      ],
       no_exploit_payloads_run: true
     };
   }
