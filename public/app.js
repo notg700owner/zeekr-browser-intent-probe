@@ -1,9 +1,9 @@
 (function () {
   "use strict";
 
-  var STORAGE_KEY = "zbip.report.v8";
-  var APP_VERSION = "1.8.0";
-  var BUILD_DATE = "2026-05-07T08:02:52Z";
+  var STORAGE_KEY = "zbip.report.v9";
+  var APP_VERSION = "1.9.0";
+  var BUILD_DATE = "2026-05-07T08:08:01Z";
   var DEFAULT_TEST_TIMEOUT_MS = 10000;
   var canUseLocalStorage = false;
   var logSyncQueue = Promise.resolve();
@@ -911,12 +911,11 @@
 
   async function collectInternalReachability() {
     var targets = buildInternalReachabilityTargets();
-    var results = [];
-    for (var i = 0; i < targets.length; i++) {
-      results.push(await probeInternalTarget(targets[i]));
-    }
+    var results = await Promise.all(targets.map(function (target) {
+      return probeInternalTarget(target);
+    }));
     return {
-      note: "One-button, fixed-list browser reachability checks only. Results can be affected by CORS, mixed-content blocking, Private Network Access, service workers, and local firewall policy. This is not a port scanner.",
+      note: "One-button, fixed-list browser reachability checks only. Targets run in parallel with per-primitive timeouts. Results can be affected by CORS, mixed-content blocking, Private Network Access, service workers, and local firewall policy. This is not a port scanner.",
       target_count: targets.length,
       targets: results
     };
@@ -957,8 +956,12 @@
       fetch_no_cors: null,
       image_load: null
     };
-    result.fetch_no_cors = await probeFetchNoCors(target.url);
-    result.image_load = await probeImageLoad(target.url);
+    var pair = await Promise.all([
+      probeFetchNoCors(target.url),
+      probeImageLoad(target.url)
+    ]);
+    result.fetch_no_cors = pair[0];
+    result.image_load = pair[1];
     return result;
   }
 

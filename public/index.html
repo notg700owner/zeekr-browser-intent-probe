@@ -12,7 +12,7 @@
     <div>
       <p class="eyebrow">Authorised defensive assessment</p>
       <h1>Zeekr Browser Intent Probe</h1>
-      <p class="build-meta">Version <strong id="appVersion">1.8.0</strong> · Build <strong id="buildDate">2026-05-07T08:02:52Z</strong></p>
+      <p class="build-meta">Version <strong id="appVersion">1.9.0</strong> · Build <strong id="buildDate">2026-05-07T08:08:01Z</strong></p>
     </div>
     <div class="status-pill" id="storageStatus">Storage: checking</div>
   </header>
@@ -75,7 +75,7 @@
           <li>Manual: chrome://version, chrome://sandbox, chrome://gpu, command line flags, process list, UID, SELinux context, package permissions, and exposed IPC surfaces.</li>
           <li>Goal: decide whether a renderer compromise would plausibly reach privileged browser, GPU/Viz, vendor IPC, shell, or ADB/debug surfaces.</li>
           <li>New: a post-renderer boundary triage row separates positive risk indicators from mitigations, blockers, and required non-web evidence.</li>
-          <li>New: one-button fixed-list internal reachability checks for localhost, loopback, and observed WebRTC subnet candidates.</li>
+          <li>New: one-button fixed-list internal reachability checks for localhost, loopback, and observed WebRTC subnet candidates, run in parallel with per-target timeouts.</li>
         </ul>
         <textarea id="chainEvidence" rows="8" placeholder="Paste or type manual evidence here: chrome://version output, chrome://sandbox status, chrome://gpu notes, ps/procfs output, UID, SELinux domain, package permissions, IPC observations"></textarea>
       </section>
